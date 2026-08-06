@@ -4,18 +4,31 @@ const ACTIVITIES_STORAGE_KEY = '@project-sprout/activities';
 
 export type FeedingMethod = 'Breast' | 'Bottle' | 'Solids';
 
-export type FeedingActivity = {
+export type DiaperType = 'Wet' | 'Dirty' | 'Both' | 'Dry';
+
+type BaseActivity = {
   id: string;
   babyProfileId: string;
-  type: 'feeding';
-  feedingMethod: FeedingMethod;
-  amountOz: number | null;
-  note: string | null;
   occurredAt: string;
   createdAt: string;
 };
 
-export type BabyActivity = FeedingActivity;
+export type FeedingActivity = BaseActivity & {
+  type: 'feeding';
+  feedingMethod: FeedingMethod;
+  amountOz: number | null;
+  note: string | null;
+};
+
+export type DiaperActivity = BaseActivity & {
+  type: 'diaper';
+  diaperType: DiaperType;
+  note: string | null;
+};
+
+export type BabyActivity =
+  | FeedingActivity
+  | DiaperActivity;
 
 export async function loadActivities(): Promise<BabyActivity[]> {
   try {
@@ -53,7 +66,7 @@ export async function addActivity(
 ): Promise<void> {
   const existingActivities = await loadActivities();
 
-  const updatedActivities = [
+  const updatedActivities: BabyActivity[] = [
     activity,
     ...existingActivities,
   ];

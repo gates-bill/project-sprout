@@ -103,17 +103,22 @@ export default function HomeScreen() {
     }, [router]),
   );
 
-  const handleQuickAction = (label: string) => {
+const handleQuickAction = (label: string) => {
     if (label === 'Feeding') {
-      router.push('/log-feeding');
-      return;
+        router.push('/log-feeding');
+        return;
+    }
+
+    if (label === 'Diaper') {
+        router.push('/log-diaper');
+        return;
     }
 
     Alert.alert(
-      label,
-      `${label} tracking is coming next.`,
+        label,
+        `${label} tracking is coming next.`,
     );
-  };
+    };
 
   if (loading || !profile) {
     return (
@@ -230,29 +235,29 @@ export default function HomeScreen() {
                 style={styles.timelineItem}
               >
                 <View style={styles.timelineIcon}>
-                  <Text style={styles.timelineEmoji}>
-                    🍼
-                  </Text>
+                    <Text style={styles.timelineEmoji}>
+                    {activity.type === 'feeding' ? '🍼' : '💧'}
+                    </Text>
                 </View>
 
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>
-                    {activity.feedingMethod} feeding
+                  {activity.type === 'feeding'
+                      ? `${activity.feedingMethod} feeding`
+                      : `${activity.diaperType} diaper`}
                   </Text>
 
                   <Text style={styles.timelineDetails}>
-                    {activity.amountOz
-                      ? `${activity.amountOz} oz · `
-                      : ''}
+                    {activity.type === 'feeding' &&
+                    activity.amountOz
+                        ? `${activity.amountOz} oz · `
+                        : ''}
                     {new Date(
-                      activity.occurredAt,
-                    ).toLocaleTimeString(
-                      undefined,
-                      {
+                        activity.occurredAt,
+                    ).toLocaleTimeString(undefined, {
                         hour: 'numeric',
                         minute: '2-digit',
-                      },
-                    )}
+                    })}
                   </Text>
 
                   {activity.note && (
