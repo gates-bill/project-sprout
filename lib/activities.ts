@@ -9,6 +9,7 @@ export type DiaperType = 'Wet' | 'Dirty' | 'Both' | 'Dry';
 type BaseActivity = {
   id: string;
   babyProfileId: string;
+  note: string | null;
   occurredAt: string;
   createdAt: string;
 };
@@ -17,18 +18,24 @@ export type FeedingActivity = BaseActivity & {
   type: 'feeding';
   feedingMethod: FeedingMethod;
   amountOz: number | null;
-  note: string | null;
 };
 
 export type DiaperActivity = BaseActivity & {
   type: 'diaper';
   diaperType: DiaperType;
-  note: string | null;
+};
+
+export type SleepActivity = BaseActivity & {
+  type: 'sleep';
+  startedAt: string;
+  endedAt: string;
+  durationMinutes: number;
 };
 
 export type BabyActivity =
   | FeedingActivity
-  | DiaperActivity;
+  | DiaperActivity
+  | SleepActivity;
 
 export async function loadActivities(): Promise<BabyActivity[]> {
   try {

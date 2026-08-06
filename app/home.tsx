@@ -1,32 +1,35 @@
 import {
-    useFocusEffect,
-    useRouter,
+  useFocusEffect,
+  useRouter,
 } from 'expo-router';
 import {
-    useCallback,
-    useState,
+  useCallback,
+  useState
 } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-    BabyActivity,
-    loadActivities,
+  BabyActivity,
+  loadActivities,
 } from '../lib/activities';
 import {
-    BabyProfile,
-    loadBabyProfile,
+  BabyProfile,
+  loadBabyProfile,
 } from '../lib/babyProfile';
-
+import {
+  ActiveSleepSession,
+  loadActiveSleepSession,
+} from '../lib/sleepSession';
 const quickActions = [
   { label: 'Feeding', icon: '🍼' },
   { label: 'Diaper', icon: '◌' },
@@ -42,7 +45,9 @@ export default function HomeScreen() {
   const [activities, setActivities] =
     useState<BabyActivity[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [activeSleep, setActiveSleep] =
+    useState<ActiveSleepSession | null>(null);
+  const [nowMs, setNowMs] = useState(Date.now());
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
@@ -52,9 +57,11 @@ export default function HomeScreen() {
           const [
             savedProfile,
             savedActivities,
+            savedActiveSleep,
           ] = await Promise.all([
             loadBabyProfile(),
             loadActivities(),
+            loadActiveSleepSession(),
           ]);
 
           if (!savedProfile) {
@@ -80,6 +87,12 @@ export default function HomeScreen() {
           if (isActive) {
             setProfile(savedProfile);
             setActivities(todaysActivities);
+
+            setActiveSleep(
+              savedActiveSleep?.babyProfileId === savedProfile.id
+                ? savedActiveSleep
+                : null,
+            );
           }
         } catch (error) {
             console.error('Unable to load home data:', error);
@@ -104,21 +117,26 @@ export default function HomeScreen() {
   );
 
 const handleQuickAction = (label: string) => {
-    if (label === 'Feeding') {
-        router.push('/log-feeding');
-        return;
-    }
+  if (label === 'Feeding') {
+    router.push('/log-feeding');
+    return;
+  }
 
-    if (label === 'Diaper') {
-        router.push('/log-diaper');
-        return;
-    }
+  if (label === 'Diaper') {
+    router.push('/log-diaper');
+    return;
+  }
 
-    Alert.alert(
-        label,
-        `${label} tracking is coming next.`,
-    );
-    };
+  if (label === 'Sleep') {
+    router.push('/log-sleep');
+    return;
+  }
+
+  Alert.alert(
+    label,
+    `${label} tracking is coming next.`,
+  );
+};
 
   if (loading || !profile) {
     return (
@@ -161,7 +179,48 @@ const handleQuickAction = (label: string) => {
           </View>
         </View>
 
-        {activities.length === 0 && (
+        {activeSleep && (
+        <Pressable
+          onPress={() => router.push('/log-sleep')}
+          style={({ pressed }) => [
+            styles.activeSleepCard,
+            pressed && styles.actionButtonPressed,
+          ]}
+        >
+          <View style={styles.activeSleepIcon}>
+            <Text style={styles.activeSleepEmoji}>☾</Text>
+          </View>
+
+          <View style={styles.activeSleepContent}>
+            <Text style={styles.activeSleepLabel}>
+              SLEEP IN PROGRESS
+            </Text>
+
+            <Text style={styles.activeSleepTime}>
+              {formatDuration(
+                Math.max(
+                  0,
+                  Math.floor(
+                    (nowMs -
+                      new Date(activeSleep.startedAt).getTime()) /
+                      60000,
+                  ),
+                ),
+              )}
+            </Text>
+
+            <Text style={styles.activeSleepStarted}>
+              Started at {formatTime(activeSleep.startedAt)}
+            </Text>
+          </View>
+
+          <Text style={styles.activeSleepAction}>
+            End ›
+          </Text>
+        </Pressable>
+      )}
+
+        {activities.length === 0 && !activeSleep && (
           <View style={styles.emptyCard}>
             <Text style={styles.cardIcon}>🌱</Text>
 
@@ -242,9 +301,11 @@ const handleQuickAction = (label: string) => {
 
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>
-                  {activity.type === 'feeding'
+                    {activity.type === 'feeding'
                       ? `${activity.feedingMethod} feeding`
-                      : `${activity.diaperType} diaper`}
+                      : activity.type === 'diaper'
+                        ? `${activity.diaperType} diaper`
+                        : 'Sleep'}
                   </Text>
 
                   <Text style={styles.timelineDetails}>
@@ -273,6 +334,32 @@ const handleQuickAction = (label: string) => {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function formatTime(value: string): string {
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes < 1) {
+    return 'Less than 1 min';
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${remainingMinutes} min`;
 }
 
 const styles = StyleSheet.create({
@@ -453,4 +540,53 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 8,
   },
+activeSleepCard: {
+  minHeight: 104,
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderColor: '#CDD9C9',
+  borderRadius: 20,
+  borderWidth: 1,
+  backgroundColor: '#E7EFE3',
+  marginTop: 24,
+  padding: 16,
+},
+activeSleepIcon: {
+  width: 48,
+  height: 48,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 24,
+  backgroundColor: '#D5E3D0',
+  marginRight: 14,
+},
+activeSleepEmoji: {
+  color: '#48684D',
+  fontSize: 26,
+},
+activeSleepContent: {
+  flex: 1,
+},
+activeSleepLabel: {
+  color: '#657A68',
+  fontSize: 10,
+  fontWeight: '700',
+  letterSpacing: 1.1,
+},
+activeSleepTime: {
+  color: '#304435',
+  fontSize: 21,
+  fontWeight: '700',
+  marginTop: 3,
+},
+activeSleepStarted: {
+  color: '#718075',
+  fontSize: 12,
+  marginTop: 3,
+},
+activeSleepAction: {
+  color: '#48684D',
+  fontSize: 14,
+  fontWeight: '700',
+},
 });
