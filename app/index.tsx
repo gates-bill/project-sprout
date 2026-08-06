@@ -1,13 +1,56 @@
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { loadBabyProfile } from '../lib/babyProfile';
 
 export default function WelcomeScreen() {
-  const showComingSoon = () => {
-    Alert.alert(
-      'Coming next',
-      'Next, we’ll create the baby profile setup flow.',
-    );
+  const router = useRouter();
+
+  const [checkingProfile, setCheckingProfile] = useState(true);
+
+useEffect(() => {
+  let isMounted = true;
+
+  const checkForSavedProfile = async () => {
+    try {
+      const savedProfile = await loadBabyProfile();
+
+      if (savedProfile) {
+        router.replace('/home');
+        return;
+      }
+    } catch {
+      // Show the welcome screen if the stored profile cannot be read.
+    }
+
+    if (isMounted) {
+      setCheckingProfile(false);
+    }
   };
+
+  checkForSavedProfile();
+
+  return () => {
+    isMounted = false;
+  };
+}, [router]);
+
+if (checkingProfile) {
+  return (
+    <SafeAreaView style={styles.loadingSafeArea}>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color="#48684D" size="large" />
+      </View>
+    </SafeAreaView>
+  );
+}
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -57,7 +100,7 @@ export default function WelcomeScreen() {
         <View style={styles.footer}>
           <Pressable
             accessibilityRole="button"
-            onPress={showComingSoon}
+            onPress={() => router.push('/create-profile')}
             style={({ pressed }) => [
               styles.primaryButton,
               pressed && styles.primaryButtonPressed,
@@ -214,5 +257,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 14,
+  },
+
+  loadingSafeArea: {
+    flex: 1,
+    backgroundColor: '#F6F7F2',
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
