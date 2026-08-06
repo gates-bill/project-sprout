@@ -132,6 +132,11 @@ const handleQuickAction = (label: string) => {
     return;
   }
 
+  if (label === 'Note') {
+    router.push('/log-note');
+    return;
+  }
+
   Alert.alert(
     label,
     `${label} tracking is coming next.`,
@@ -295,30 +300,17 @@ const handleQuickAction = (label: string) => {
               >
                 <View style={styles.timelineIcon}>
                     <Text style={styles.timelineEmoji}>
-                    {activity.type === 'feeding' ? '🍼' : '💧'}
+                      {getActivityIcon(activity)}
                     </Text>
                 </View>
 
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>
-                    {activity.type === 'feeding'
-                      ? `${activity.feedingMethod} feeding`
-                      : activity.type === 'diaper'
-                        ? `${activity.diaperType} diaper`
-                        : 'Sleep'}
+                    {getActivityTitle(activity)}
                   </Text>
 
                   <Text style={styles.timelineDetails}>
-                    {activity.type === 'feeding' &&
-                    activity.amountOz
-                        ? `${activity.amountOz} oz · `
-                        : ''}
-                    {new Date(
-                        activity.occurredAt,
-                    ).toLocaleTimeString(undefined, {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                    })}
+                    {getActivityDetails(activity)}
                   </Text>
 
                   {activity.note && (
@@ -334,6 +326,59 @@ const handleQuickAction = (label: string) => {
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function getActivityIcon(activity: BabyActivity): string {
+  switch (activity.type) {
+    case 'feeding':
+      return '🍼';
+
+    case 'diaper':
+      return '💧';
+
+    case 'sleep':
+      return '☾';
+
+    case 'note':
+      return '＋';
+  }
+}
+
+function getActivityTitle(activity: BabyActivity): string {
+  switch (activity.type) {
+    case 'feeding':
+      return `${activity.feedingMethod} feeding`;
+
+    case 'diaper':
+      return `${activity.diaperType} diaper`;
+
+    case 'sleep':
+      return 'Sleep';
+
+    case 'note':
+      return 'Note';
+  }
+}
+
+function getActivityDetails(activity: BabyActivity): string {
+  if (activity.type === 'sleep') {
+    return (
+      `${formatTime(activity.startedAt)}–` +
+      `${formatTime(activity.endedAt)} · ` +
+      formatDuration(activity.durationMinutes)
+    );
+  }
+
+  const time = formatTime(activity.occurredAt);
+
+  if (
+    activity.type === 'feeding' &&
+    activity.amountOz !== null
+  ) {
+    return `${activity.amountOz} oz · ${time}`;
+  }
+
+  return time;
 }
 
 function formatTime(value: string): string {

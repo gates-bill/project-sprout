@@ -32,10 +32,16 @@ export type SleepActivity = BaseActivity & {
   durationMinutes: number;
 };
 
+export type NoteActivity = BaseActivity & {
+  type: 'note';
+  note: string;
+};
+
 export type BabyActivity =
   | FeedingActivity
   | DiaperActivity
-  | SleepActivity;
+  | SleepActivity
+  | NoteActivity;
 
 export async function loadActivities(): Promise<BabyActivity[]> {
   try {
