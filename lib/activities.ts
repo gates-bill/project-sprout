@@ -89,3 +89,30 @@ export async function addActivity(
     JSON.stringify(updatedActivities),
   );
 }
+
+export async function loadActivityById(
+  activityId: string,
+): Promise<BabyActivity | null> {
+  const activities = await loadActivities();
+
+  return (
+    activities.find(
+      (activity) => activity.id === activityId,
+    ) ?? null
+  );
+}
+
+export async function deleteActivity(
+  activityId: string,
+): Promise<void> {
+  const activities = await loadActivities();
+
+  const updatedActivities = activities.filter(
+    (activity) => activity.id !== activityId,
+  );
+
+  await AsyncStorage.setItem(
+    ACTIVITIES_STORAGE_KEY,
+    JSON.stringify(updatedActivities),
+  );
+}

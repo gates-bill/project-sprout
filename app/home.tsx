@@ -294,9 +294,21 @@ const handleQuickAction = (label: string) => {
         ) : (
           <View style={styles.timeline}>
             {activities.map((activity) => (
-              <View
+              <Pressable
+                accessibilityRole="button"
                 key={activity.id}
-                style={styles.timelineItem}
+                onPress={() =>
+                  router.push({
+                    pathname: '/activity/[id]',
+                    params: {
+                      id: activity.id,
+                    },
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.timelineItem,
+                  pressed && styles.timelineItemPressed,
+                ]}
               >
                 <View style={styles.timelineIcon}>
                     <Text style={styles.timelineEmoji}>
@@ -319,7 +331,7 @@ const handleQuickAction = (label: string) => {
                     </Text>
                   )}
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
         )}
@@ -553,6 +565,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: '#FFFEFA',
     padding: 16,
+  },
+  timelineItemPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.99 }],
   },
   timelineIcon: {
     width: 42,
