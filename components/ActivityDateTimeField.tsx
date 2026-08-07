@@ -8,11 +8,13 @@ import {
 } from 'react-native';
 
 type ActivityDateTimeFieldProps = {
+  label?: string;
   value: Date;
   onChange: (value: Date) => void;
 };
 
 export default function ActivityDateTimeField({
+  label = 'DATE & TIME',
   value,
   onChange,
 }: ActivityDateTimeFieldProps) {
@@ -34,9 +36,7 @@ export default function ActivityDateTimeField({
         ]}
       >
         <View>
-          <Text style={styles.fieldLabel}>
-            DATE & TIME
-          </Text>
+          <Text style={styles.label}>{label}</Text>
 
           <Text style={styles.fieldValue}>
             {value.toLocaleDateString(undefined, {

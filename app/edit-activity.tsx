@@ -1,28 +1,29 @@
 import {
-    useLocalSearchParams,
-    useRouter,
+  useLocalSearchParams,
+  useRouter,
 } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ActivityDateTimeField from '../components/ActivityDateTimeField';
 import {
-    BabyActivity,
-    DiaperType,
-    FeedingMethod,
-    loadActivityById,
-    updateActivity,
+  BabyActivity,
+  DiaperType,
+  FeedingMethod,
+  loadActivityById,
+  updateActivity,
 } from '../lib/activities';
 
 const feedingMethods: FeedingMethod[] = [
@@ -56,6 +57,15 @@ export default function EditActivityScreen() {
 
   const [amountOz, setAmountOz] = useState('');
   const [note, setNote] = useState('');
+
+  const [occurredAt, setOccurredAt] =
+    useState(new Date());
+
+  const [startedAt, setStartedAt] =
+    useState(new Date());
+
+  const [endedAt, setEndedAt] =
+    useState(new Date());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -100,10 +110,34 @@ export default function EditActivityScreen() {
               ? savedActivity.amountOz.toString()
               : '',
           );
+
+          setOccurredAt(
+            new Date(savedActivity.occurredAt),
+          );
         }
 
         if (savedActivity.type === 'diaper') {
           setDiaperType(savedActivity.diaperType);
+
+          setOccurredAt(
+            new Date(savedActivity.occurredAt),
+          );
+        }
+
+        if (savedActivity.type === 'note') {
+          setOccurredAt(
+            new Date(savedActivity.occurredAt),
+          );
+        }
+
+        if (savedActivity.type === 'sleep') {
+          setStartedAt(
+            new Date(savedActivity.startedAt),
+          );
+
+          setEndedAt(
+            new Date(savedActivity.endedAt),
+          );
         }
       } catch (error) {
         console.error(
@@ -162,6 +196,49 @@ export default function EditActivityScreen() {
       }
     }
 
+    if (
+      activity.type !== 'sleep' &&
+      occurredAt.getTime() > Date.now()
+    ) {
+      Alert.alert(
+        'Check the time',
+        'An entry cannot be saved in the future.',
+      );
+
+      return;
+    }
+
+    if (activity.type === 'sleep') {
+      if (startedAt.getTime() > Date.now()) {
+        Alert.alert(
+          'Check the start time',
+          'Sleep cannot start in the future.',
+        );
+
+        return;
+      }
+
+      if (endedAt.getTime() > Date.now()) {
+        Alert.alert(
+          'Check the end time',
+          'Sleep cannot end in the future.',
+        );
+
+        return;
+      }
+
+      if (
+        endedAt.getTime() <= startedAt.getTime()
+      ) {
+        Alert.alert(
+          'Check the times',
+          'The sleep end time must be after the start time.',
+        );
+
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -175,6 +252,7 @@ export default function EditActivityScreen() {
                 ? parsedAmount
                 : null,
             note: note.trim() || null,
+            occurredAt: occurredAt.toISOString(),
           });
           break;
 
@@ -183,15 +261,31 @@ export default function EditActivityScreen() {
             ...activity,
             diaperType,
             note: note.trim() || null,
+            occurredAt: occurredAt.toISOString(),
           });
           break;
 
-        case 'sleep':
+        case 'sleep': {
+          const durationMinutes = Math.max(
+            1,
+            Math.round(
+              (endedAt.getTime() -
+                startedAt.getTime()) /
+                60000,
+            ),
+          );
+
           await updateActivity({
             ...activity,
+            startedAt: startedAt.toISOString(),
+            endedAt: endedAt.toISOString(),
+            durationMinutes,
+            occurredAt: endedAt.toISOString(),
             note: note.trim() || null,
           });
+
           break;
+        }
 
         case 'note': {
           const trimmedNote = note.trim();
@@ -209,7 +303,9 @@ export default function EditActivityScreen() {
           await updateActivity({
             ...activity,
             note: trimmedNote,
+            occurredAt: occurredAt.toISOString(),
           });
+
           break;
         }
       }
@@ -251,6 +347,18 @@ export default function EditActivityScreen() {
     );
   }
 
+  const sleepDurationMinutes =
+    activity.type === 'sleep'
+      ? Math.max(
+          0,
+          Math.round(
+            (endedAt.getTime() -
+              startedAt.getTime()) /
+              60000,
+          ),
+        )
+      : 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -286,8 +394,8 @@ export default function EditActivityScreen() {
           </Text>
 
           <Text style={styles.description}>
-            The original date and time will remain
-            unchanged.
+            Update the details or correct when this
+            happened.
           </Text>
 
           {activity.type === 'feeding' && (
@@ -335,7 +443,8 @@ export default function EditActivityScreen() {
                   <Text style={styles.label}>
                     Amount in ounces
                     <Text style={styles.optional}>
-                      {' '}· Optional
+                      {' '}
+                      · Optional
                     </Text>
                   </Text>
 
@@ -393,6 +502,42 @@ export default function EditActivityScreen() {
             </View>
           )}
 
+          {activity.type !== 'sleep' && (
+            <ActivityDateTimeField
+              label="DATE & TIME"
+              onChange={setOccurredAt}
+              value={occurredAt}
+            />
+          )}
+
+          {activity.type === 'sleep' && (
+            <>
+              <ActivityDateTimeField
+                label="STARTED"
+                onChange={setStartedAt}
+                value={startedAt}
+              />
+
+              <ActivityDateTimeField
+                label="ENDED"
+                onChange={setEndedAt}
+                value={endedAt}
+              />
+
+              <View style={styles.durationCard}>
+                <Text style={styles.durationLabel}>
+                  DURATION
+                </Text>
+
+                <Text style={styles.durationValue}>
+                  {formatDuration(
+                    sleepDurationMinutes,
+                  )}
+                </Text>
+              </View>
+            </>
+          )}
+
           <View style={styles.section}>
             <Text style={styles.label}>
               {activity.type === 'note'
@@ -426,25 +571,6 @@ export default function EditActivityScreen() {
                 : 250}
             </Text>
           </View>
-
-          {activity.type === 'sleep' && (
-            <View style={styles.readOnlyCard}>
-              <Text style={styles.readOnlyLabel}>
-                SLEEP SESSION
-              </Text>
-
-              <Text style={styles.readOnlyValue}>
-                {formatTime(activity.startedAt)}
-                {' – '}
-                {formatTime(activity.endedAt)}
-              </Text>
-
-              <Text style={styles.readOnlyHelper}>
-                Start time, end time, and duration
-                editing will come later.
-              </Text>
-            </View>
-          )}
 
           <View style={styles.footer}>
             <Pressable
@@ -499,14 +625,25 @@ function getEditTitle(
   }
 }
 
-function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString(
-    undefined,
-    {
-      hour: 'numeric',
-      minute: '2-digit',
-    },
-  );
+function formatDuration(
+  minutes: number,
+): string {
+  if (minutes <= 0) {
+    return 'Check times';
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${remainingMinutes} min`;
 }
 
 const styles = StyleSheet.create({
@@ -647,31 +784,25 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 7,
   },
-  readOnlyCard: {
+  durationCard: {
     borderColor: '#DDE5D9',
     borderRadius: 18,
     borderWidth: 1,
     backgroundColor: '#EBF0E7',
-    marginTop: 24,
+    marginTop: 20,
     padding: 17,
   },
-  readOnlyLabel: {
+  durationLabel: {
     color: '#657A68',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,
   },
-  readOnlyValue: {
+  durationValue: {
     color: '#304435',
     fontSize: 17,
     fontWeight: '700',
     marginTop: 7,
-  },
-  readOnlyHelper: {
-    color: '#718075',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 6,
   },
   footer: {
     marginTop: 'auto',
