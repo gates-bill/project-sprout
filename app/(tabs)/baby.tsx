@@ -1,8 +1,12 @@
-import { useFocusEffect } from 'expo-router';
+import {
+    useFocusEffect,
+    useRouter,
+} from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Image,
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -15,6 +19,8 @@ import {
 } from '../../lib/babyProfile';
 
 export default function BabyScreen() {
+  const router = useRouter();
+
   const [profile, setProfile] =
     useState<BabyProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,16 +107,18 @@ export default function BabyScreen() {
           )}
         </View>
 
-        <View style={styles.comingSoonCard}>
-          <Text style={styles.comingSoonTitle}>
-            Profile editing is next
-          </Text>
-
-          <Text style={styles.comingSoonText}>
-            You’ll be able to change the name,
-            birthday, and profile photo here.
-          </Text>
-        </View>
+        <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/edit-profile')}
+            style={({ pressed }) => [
+                styles.editButton,
+                pressed && styles.editButtonPressed,
+            ]}
+            >
+            <Text style={styles.editButtonText}>
+                Edit profile
+            </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -182,23 +190,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 6,
   },
-  comingSoonCard: {
-    borderColor: '#DDE5D9',
-    borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: '#EBF0E7',
-    marginTop: 20,
-    padding: 19,
-  },
-  comingSoonTitle: {
-    color: '#304435',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  comingSoonText: {
-    color: '#718075',
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 6,
-  },
+  editButton: {
+  minHeight: 56,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 17,
+  backgroundColor: '#48684D',
+  marginTop: 20,
+},
+editButtonPressed: {
+  opacity: 0.82,
+  transform: [{ scale: 0.99 }],
+},
+editButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '700',
+},
 });
