@@ -49,7 +49,8 @@ export default function HomeScreen() {
   const [activeSleep, setActiveSleep] =
     useState<ActiveSleepSession | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
-  
+  const todaySummary = getTodaySummary(activities);
+
   useEffect(() => {
     if (!activeSleep) {
       return;
@@ -257,6 +258,56 @@ const handleQuickAction = (label: string) => {
           </View>
         )}
 
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryHeading}>
+              Today at a glance
+            </Text>
+
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryIcon}>🍼</Text>
+                <Text style={styles.summaryValue}>
+                  {todaySummary.feedings}
+                </Text>
+                <Text style={styles.summaryLabel}>
+                  Feedings
+                </Text>
+              </View>
+
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryIcon}>◌</Text>
+                <Text style={styles.summaryValue}>
+                  {todaySummary.diapers}
+                </Text>
+                <Text style={styles.summaryLabel}>
+                  Diapers
+                </Text>
+              </View>
+
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryIcon}>☾</Text>
+                <Text style={styles.summaryValue}>
+                  {formatSummarySleep(
+                    todaySummary.sleepMinutes,
+                  )}
+                </Text>
+                <Text style={styles.summaryLabel}>
+                  Sleep
+                </Text>
+              </View>
+
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryIcon}>✎</Text>
+                <Text style={styles.summaryValue}>
+                  {todaySummary.notes}
+                </Text>
+                <Text style={styles.summaryLabel}>
+                  Notes
+                </Text>
+              </View>
+            </View>
+          </View>
+
         <Text style={styles.sectionTitle}>
           Quick add
         </Text>
@@ -433,6 +484,88 @@ function formatDuration(minutes: number): string {
   }
 
   return `${hours} hr ${remainingMinutes} min`;
+}
+
+function getTodaySummary(
+  activities: BabyActivity[],
+) {
+  const now = new Date();
+
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+
+  const startOfTomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  ).getTime();
+
+  let feedings = 0;
+  let diapers = 0;
+  let sleepMinutes = 0;
+  let notes = 0;
+
+  activities.forEach((activity) => {
+    const occurredAt =
+      new Date(activity.occurredAt).getTime();
+
+    if (
+      occurredAt < startOfToday ||
+      occurredAt >= startOfTomorrow
+    ) {
+      return;
+    }
+
+    switch (activity.type) {
+      case 'feeding':
+        feedings += 1;
+        break;
+
+      case 'diaper':
+        diapers += 1;
+        break;
+
+      case 'sleep':
+        sleepMinutes +=
+          activity.durationMinutes;
+        break;
+
+      case 'note':
+        notes += 1;
+        break;
+    }
+  });
+
+  return {
+    feedings,
+    diapers,
+    sleepMinutes,
+    notes,
+  };
+}
+
+function formatSummarySleep(
+  minutes: number,
+): string {
+  if (minutes === 0) {
+    return '—';
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${remainingMinutes}m`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 const styles = StyleSheet.create({
@@ -665,5 +798,44 @@ activeSleepAction: {
   color: '#48684D',
   fontSize: 14,
   fontWeight: '700',
+},
+summarySection: {
+  marginTop: 24,
+},
+summaryHeading: {
+  color: '#344A39',
+  fontSize: 16,
+  fontWeight: '700',
+  marginBottom: 12,
+},
+summaryGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 10,
+},
+summaryCard: {
+  width: '48%',
+  minHeight: 104,
+  justifyContent: 'center',
+  borderColor: '#E0E6DD',
+  borderRadius: 18,
+  borderWidth: 1,
+  backgroundColor: '#FFFEFA',
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+},
+summaryIcon: {
+  fontSize: 18,
+  marginBottom: 6,
+},
+summaryValue: {
+  color: '#304435',
+  fontSize: 22,
+  fontWeight: '700',
+},
+summaryLabel: {
+  color: '#768078',
+  fontSize: 13,
+  marginTop: 3,
 },
 });
