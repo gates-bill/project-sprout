@@ -184,6 +184,24 @@ const handleQuickAction = (label: string) => {
           </View>
         </View>
 
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/history')}
+          style={({ pressed }) => [
+            styles.historyButton,
+            pressed && styles.actionButtonPressed,
+          ]}
+        >
+          <Text style={styles.historyButtonText}>
+            View activity history
+          </Text>
+
+          <Text style={styles.historyButtonArrow}>
+            ›
+          </Text>
+        </Pressable>
+
         {activeSleep && (
         <Pressable
           onPress={() => router.push('/log-sleep')}
@@ -649,5 +667,26 @@ activeSleepAction: {
   color: '#48684D',
   fontSize: 14,
   fontWeight: '700',
+},
+historyButton: {
+  minHeight: 50,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  borderColor: '#DDE3DA',
+  borderRadius: 16,
+  borderWidth: 1,
+  backgroundColor: '#FFFEFA',
+  marginTop: 22,
+  paddingHorizontal: 17,
+},
+historyButtonText: {
+  color: '#48684D',
+  fontSize: 14,
+  fontWeight: '700',
+},
+historyButtonArrow: {
+  color: '#718075',
+  fontSize: 23,
 },
 });
