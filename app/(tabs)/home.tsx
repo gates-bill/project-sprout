@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [activeSleep, setActiveSleep] =
     useState<ActiveSleepSession | null>(null);
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs] = useState(Date.now());
   useFocusEffect(
     useCallback(() => {
       let isActive = true;

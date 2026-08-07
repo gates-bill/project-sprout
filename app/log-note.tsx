@@ -1,25 +1,26 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ActivityDateTimeField from '../components/ActivityDateTimeField';
 import { addActivity } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
 
 export default function LogNoteScreen() {
   const router = useRouter();
-
+  const [occurredAt, setOccurredAt] = useState(new Date());
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -27,6 +28,15 @@ export default function LogNoteScreen() {
 
   const saveNote = async () => {
     if (!canSave) {
+      return;
+    }
+
+    if (occurredAt.getTime() > Date.now()) {
+      Alert.alert(
+        'Check the time',
+        'A note cannot be logged in the future.',
+      );
+
       return;
     }
 
@@ -45,15 +55,16 @@ export default function LogNoteScreen() {
         return;
       }
 
-      const now = new Date().toISOString();
+      const createdAt = new Date().toISOString();
+      const occurredAtIso = occurredAt.toISOString();
 
       await addActivity({
         id: Date.now().toString(),
         babyProfileId: profile.id,
         type: 'note',
         note: note.trim(),
-        occurredAt: now,
-        createdAt: now,
+        occurredAt: occurredAtIso,
+      createdAt,
       });
 
       router.back();
@@ -130,14 +141,10 @@ export default function LogNoteScreen() {
             </Text>
           </View>
 
-          <View style={styles.timeCard}>
-            <View>
-              <Text style={styles.timeLabel}>NOTE TIME</Text>
-              <Text style={styles.timeValue}>Now</Text>
-            </View>
-
-            <Text style={styles.timeIcon}>◷</Text>
-          </View>
+          <ActivityDateTimeField
+            onChange={setOccurredAt}
+            value={occurredAt}
+          />
 
           <View style={styles.footer}>
             <Pressable

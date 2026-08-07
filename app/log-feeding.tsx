@@ -1,22 +1,23 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ActivityDateTimeField from '../components/ActivityDateTimeField';
 import {
-    addActivity,
-    FeedingMethod,
+  addActivity,
+  FeedingMethod,
 } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
 
@@ -36,6 +37,9 @@ export default function LogFeedingScreen() {
   const [saving, setSaving] = useState(false);
 
   const canSave = feedingMethod !== null && !saving;
+
+  const [occurredAt, setOccurredAt] =
+    useState(new Date());
 
   const saveFeeding = async () => {
     if (!feedingMethod || saving) {
@@ -58,6 +62,15 @@ export default function LogFeedingScreen() {
       return;
     }
 
+    if (occurredAt.getTime() > Date.now()) {
+      Alert.alert(
+        'Check the time',
+        'A feeding cannot be logged in the future.',
+      );
+
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -73,7 +86,8 @@ export default function LogFeedingScreen() {
         return;
       }
 
-      const now = new Date().toISOString();
+      const createdAt = new Date().toISOString();
+      const occurredAtIso = occurredAt.toISOString();
 
       await addActivity({
         id: Date.now().toString(),
@@ -85,8 +99,8 @@ export default function LogFeedingScreen() {
             ? parsedAmount
             : null,
         note: note.trim() || null,
-        occurredAt: now,
-        createdAt: now,
+        occurredAt: occurredAtIso,
+        createdAt: createdAt,
       });
 
       router.back();
@@ -196,14 +210,10 @@ export default function LogFeedingScreen() {
             />
           </View>
 
-          <View style={styles.timeCard}>
-            <View>
-              <Text style={styles.timeLabel}>Feeding time</Text>
-              <Text style={styles.timeValue}>Now</Text>
-            </View>
-
-            <Text style={styles.timeIcon}>◷</Text>
-          </View>
+          <ActivityDateTimeField
+            onChange={setOccurredAt}
+            value={occurredAt}
+          />
 
           <View style={styles.footer}>
             <Pressable
@@ -333,34 +343,6 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 110,
     paddingTop: 16,
-  },
-  timeCard: {
-    minHeight: 72,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderColor: '#E0E5DC',
-    borderRadius: 18,
-    borderWidth: 1,
-    backgroundColor: '#EBF0E7',
-    marginTop: 28,
-    paddingHorizontal: 18,
-  },
-  timeLabel: {
-    color: '#718075',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  timeValue: {
-    color: '#304435',
-    fontSize: 17,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  timeIcon: {
-    color: '#52705A',
-    fontSize: 24,
   },
   footer: {
     marginTop: 'auto',
