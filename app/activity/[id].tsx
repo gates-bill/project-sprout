@@ -1,8 +1,9 @@
 import {
+    useFocusEffect,
     useLocalSearchParams,
     useRouter,
 } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -32,55 +33,59 @@ export default function ActivityDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    let isActive = true;
+  useFocusEffect(
+    useCallback(() => {
+        let isActive = true;
 
-    const loadActivity = async () => {
-      try {
-        const savedActivity =
-          await loadActivityById(id);
+        setLoading(true);
 
-        if (!savedActivity) {
-          Alert.alert(
-            'Entry not found',
-            'This entry may have already been deleted.',
-            [
-              {
-                text: 'Return home',
-                onPress: () => router.back(),
-              },
-            ],
-          );
+        const loadActivity = async () => {
+        try {
+            const savedActivity =
+            await loadActivityById(id);
 
-          return;
+            if (!savedActivity) {
+            Alert.alert(
+                'Entry not found',
+                'This entry may have already been deleted.',
+                [
+                {
+                    text: 'Return home',
+                    onPress: () => router.back(),
+                },
+                ],
+            );
+
+            return;
+            }
+
+            if (isActive) {
+            setActivity(savedActivity);
+            }
+        } catch (error) {
+            console.error(
+            'Unable to load activity:',
+            error,
+            );
+
+            Alert.alert(
+            'Unable to open entry',
+            'Please return to the dashboard and try again.',
+            );
+        } finally {
+            if (isActive) {
+            setLoading(false);
+            }
         }
+        };
 
-        if (isActive) {
-          setActivity(savedActivity);
-        }
-      } catch (error) {
-        console.error(
-          'Unable to load activity:',
-          error,
-        );
+        loadActivity();
 
-        Alert.alert(
-          'Unable to open entry',
-          'Please return to the dashboard and try again.',
-        );
-      } finally {
-        if (isActive) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadActivity();
-
-    return () => {
-      isActive = false;
-    };
-  }, [id, router]);
+        return () => {
+        isActive = false;
+        };
+    }, [id, router]),
+    );
 
   const confirmDelete = () => {
     if (!activity || deleting) {
@@ -277,6 +282,26 @@ export default function ActivityDetailScreen() {
         )}
 
         <View style={styles.footer}>
+            <Pressable
+                accessibilityRole="button"
+                disabled={deleting}
+                onPress={() =>
+                    router.push({
+                    pathname: '/edit-activity',
+                    params: {
+                        id: activity.id,
+                    },
+                    })
+                }
+                style={({ pressed }) => [
+                    styles.editButton,
+                    pressed && styles.pressed,
+                ]}
+                >
+                <Text style={styles.editButtonText}>
+                    Edit entry
+                </Text>
+            </Pressable>
           <Pressable
             accessibilityRole="button"
             disabled={deleting}
@@ -502,10 +527,11 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     marginTop: 9,
   },
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 38,
-  },
+footer: {
+  gap: 12,
+  marginTop: 'auto',
+  paddingTop: 38,
+},
   deleteButton: {
     minHeight: 56,
     alignItems: 'center',
@@ -520,6 +546,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+editButton: {
+  minHeight: 56,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 17,
+  backgroundColor: '#48684D',
+},
+editButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '700',
+},
   disabledButton: {
     opacity: 0.6,
   },

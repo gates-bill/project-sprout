@@ -116,3 +116,28 @@ export async function deleteActivity(
     JSON.stringify(updatedActivities),
   );
 }
+
+export async function updateActivity(
+  updatedActivity: BabyActivity,
+): Promise<void> {
+  const activities = await loadActivities();
+
+  const activityExists = activities.some(
+    (activity) => activity.id === updatedActivity.id,
+  );
+
+  if (!activityExists) {
+    throw new Error('Activity not found');
+  }
+
+  const updatedActivities = activities.map((activity) =>
+    activity.id === updatedActivity.id
+      ? updatedActivity
+      : activity,
+  );
+
+  await AsyncStorage.setItem(
+    ACTIVITIES_STORAGE_KEY,
+    JSON.stringify(updatedActivities),
+  );
+}
