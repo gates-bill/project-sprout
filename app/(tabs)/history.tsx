@@ -1,27 +1,27 @@
 import {
-    useFocusEffect,
-    useRouter,
+  useFocusEffect,
+  useRouter,
 } from 'expo-router';
 import {
-    useCallback,
-    useState,
+  useCallback,
+  useState,
 } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-    BabyActivity,
-    loadActivities,
-} from '../lib/activities';
-import { loadBabyProfile } from '../lib/babyProfile';
+  BabyActivity,
+  loadActivities,
+} from '../../lib/activities';
+import { loadBabyProfile } from '../../lib/babyProfile';
 
 type ActivityGroup = {
   dateKey: string;
@@ -113,14 +113,6 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>‹</Text>
-        </Pressable>
 
         <Text style={styles.eyebrow}>
           ACTIVITY HISTORY
@@ -446,22 +438,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 8,
     paddingBottom: 34,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 22,
-    backgroundColor: '#E7ECE3',
-    marginBottom: 28,
-  },
-  backButtonText: {
-    color: '#405B45',
-    fontSize: 34,
-    fontWeight: '300',
-    lineHeight: 36,
-    marginTop: -3,
   },
   eyebrow: {
     color: '#657A68',

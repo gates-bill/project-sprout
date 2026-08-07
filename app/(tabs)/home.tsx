@@ -21,15 +21,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BabyActivity,
   loadActivities,
-} from '../lib/activities';
+} from '../../lib/activities';
 import {
   BabyProfile,
   loadBabyProfile,
-} from '../lib/babyProfile';
+} from '../../lib/babyProfile';
 import {
   ActiveSleepSession,
   loadActiveSleepSession,
-} from '../lib/sleepSession';
+} from '../../lib/sleepSession';
 const quickActions = [
   { label: 'Feeding', icon: '🍼' },
   { label: 'Diaper', icon: '◌' },
@@ -183,24 +183,6 @@ const handleQuickAction = (label: string) => {
             )}
           </View>
         </View>
-
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/history')}
-          style={({ pressed }) => [
-            styles.historyButton,
-            pressed && styles.actionButtonPressed,
-          ]}
-        >
-          <Text style={styles.historyButtonText}>
-            View activity history
-          </Text>
-
-          <Text style={styles.historyButtonArrow}>
-            ›
-          </Text>
-        </Pressable>
 
         {activeSleep && (
         <Pressable
@@ -667,26 +649,5 @@ activeSleepAction: {
   color: '#48684D',
   fontSize: 14,
   fontWeight: '700',
-},
-historyButton: {
-  minHeight: 50,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  borderColor: '#DDE3DA',
-  borderRadius: 16,
-  borderWidth: 1,
-  backgroundColor: '#FFFEFA',
-  marginTop: 22,
-  paddingHorizontal: 17,
-},
-historyButtonText: {
-  color: '#48684D',
-  fontSize: 14,
-  fontWeight: '700',
-},
-historyButtonArrow: {
-  color: '#718075',
-  fontSize: 23,
 },
 });
