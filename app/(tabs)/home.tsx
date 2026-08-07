@@ -4,6 +4,7 @@ import {
 } from 'expo-router';
 import {
   useCallback,
+  useEffect,
   useState
 } from 'react';
 import {
@@ -47,7 +48,22 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [activeSleep, setActiveSleep] =
     useState<ActiveSleepSession | null>(null);
-  const [nowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(Date.now());
+  
+  useEffect(() => {
+    if (!activeSleep) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setNowMs(Date.now());
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [activeSleep]);
+
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
