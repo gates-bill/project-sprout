@@ -1,26 +1,26 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { addActivity } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
 import {
-    ActiveSleepSession,
-    clearActiveSleepSession,
-    loadActiveSleepSession,
-    saveActiveSleepSession,
+  ActiveSleepSession,
+  clearActiveSleepSession,
+  loadActiveSleepSession,
+  saveActiveSleepSession,
 } from '../lib/sleepSession';
 
 export default function LogSleepScreen() {
@@ -315,6 +315,23 @@ export default function LogSleepScreen() {
               )}
             </Pressable>
 
+          {!activeSleep && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push('/log-sleep-manual')
+              }
+              style={({ pressed }) => [
+                styles.manualButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.manualButtonText}>
+                Add completed sleep
+              </Text>
+            </Pressable>
+          )}
+
             <Text style={styles.helperText}>
               {activeSleep
                 ? 'Ending creates a completed entry in Today.'
@@ -505,4 +522,20 @@ const styles = StyleSheet.create({
     opacity: 0.82,
     transform: [{ scale: 0.99 }],
   },
+
+ manualButton: {
+  minHeight: 54,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderColor: '#C9D6C5',
+  borderRadius: 18,
+  borderWidth: 1,
+  backgroundColor: '#FFFEFA',
+  marginTop: 12,
+},
+manualButtonText: {
+  color: '#48684D',
+  fontSize: 16,
+  fontWeight: '700',
+},
 });
