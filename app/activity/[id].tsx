@@ -1,25 +1,33 @@
 import {
-    useFocusEffect,
-    useLocalSearchParams,
-    useRouter,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
 } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-    BabyActivity,
-    deleteActivity,
-    loadActivityById,
+  BabyActivity,
+  deleteActivity,
+  loadActivityById,
 } from '../../lib/activities';
+
+import { loadMyCareCircle } from '../../lib/careCircle';
+import {
+  deleteCloudActivity,
+} from '../../lib/cloudActivities';
+import {
+  loadCloudBabyForCircle,
+} from '../../lib/cloudBaby';
 
 export default function ActivityDetailScreen() {
   const router = useRouter();
@@ -109,30 +117,49 @@ export default function ActivityDetailScreen() {
     );
   };
 
-  const handleDelete = async () => {
-    if (!activity || deleting) {
-      return;
+const handleDelete = async () => {
+  if (!activity || deleting) {
+    return;
+  }
+
+  setDeleting(true);
+
+  try {
+    const circle = await loadMyCareCircle();
+
+    if (circle) {
+      const cloudBaby =
+        await loadCloudBabyForCircle(
+          circle.id,
+        );
+
+      if (cloudBaby) {
+        await deleteCloudActivity(
+          cloudBaby.id,
+          activity.id,
+        );
+      }
     }
 
-    setDeleting(true);
+    await deleteActivity(activity.id);
 
-    try {
-      await deleteActivity(activity.id);
-      router.back();
-    } catch (error) {
-      console.error(
-        'Unable to delete activity:',
-        error,
-      );
+    router.back();
+  } catch (error) {
+    console.error(
+      'Unable to delete activity:',
+      error,
+    );
 
-      Alert.alert(
-        'Unable to delete entry',
-        'The entry could not be deleted. Please try again.',
-      );
+    Alert.alert(
+      'Unable to delete entry',
+      error instanceof Error
+        ? error.message
+        : 'The entry could not be deleted. Please try again.',
+    );
 
-      setDeleting(false);
-    }
-  };
+    setDeleting(false);
+  }
+};
 
   if (loading) {
     return (

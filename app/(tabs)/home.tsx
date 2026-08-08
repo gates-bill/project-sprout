@@ -27,6 +27,11 @@ import {
   BabyProfile,
   loadBabyProfile,
 } from '../../lib/babyProfile';
+import { loadMyCareCircle } from '../../lib/careCircle';
+import {
+  downloadCloudActivities,
+} from '../../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 import {
   ActiveSleepSession,
   loadActiveSleepSession,
@@ -69,61 +74,90 @@ export default function HomeScreen() {
     useCallback(() => {
       let isActive = true;
 
-      const loadHomeData = async () => {
-        try {
-          const [
-            savedProfile,
-            savedActivities,
-            savedActiveSleep,
-          ] = await Promise.all([
-            loadBabyProfile(),
-            loadActivities(),
-            loadActiveSleepSession(),
-          ]);
+const loadHomeData = async () => {
+  try {
+    const [
+      savedProfile,
+      savedActiveSleep,
+    ] = await Promise.all([
+      loadBabyProfile(),
+      loadActiveSleepSession(),
+    ]);
 
-          if (!savedProfile) {
-            router.replace('/');
-            return;
-          }
+    if (!savedProfile) {
+      router.replace('/');
+      return;
+    }
 
-          const today = new Date();
+    try {
+      const circle =
+        await loadMyCareCircle();
 
-          const todaysActivities =
-            savedActivities.filter((activity) => {
-              const activityDate =
-                new Date(activity.occurredAt);
+      if (circle) {
+        const cloudBaby =
+          await loadCloudBabyForCircle(
+            circle.id,
+          );
 
-              return (
-                activity.babyProfileId ===
-                  savedProfile.id &&
-                activityDate.toDateString() ===
-                  today.toDateString()
-              );
-            });
-
-          if (isActive) {
-            setProfile(savedProfile);
-            setActivities(todaysActivities);
-
-            setActiveSleep(
-              savedActiveSleep?.babyProfileId === savedProfile.id
-                ? savedActiveSleep
-                : null,
-            );
-          }
-        } catch (error) {
-            console.error('Unable to load home data:', error);
-
-            Alert.alert(
-                'Unable to load today',
-                'Please close the app and try again.',
-            );
-            } finally {
-          if (isActive) {
-            setLoading(false);
-          }
+        if (cloudBaby) {
+          await downloadCloudActivities(
+            cloudBaby.id,
+            savedProfile.id,
+          );
         }
-      };
+      }
+    } catch (syncError) {
+      console.warn(
+        'Unable to refresh shared activities:',
+        syncError,
+      );
+    }
+
+    const savedActivities =
+      await loadActivities();
+
+    const today = new Date();
+
+    const todaysActivities =
+      savedActivities.filter((activity) => {
+        const activityDate =
+          new Date(activity.occurredAt);
+
+        return (
+          activity.babyProfileId ===
+            savedProfile.id &&
+          activityDate.toDateString() ===
+            today.toDateString()
+        );
+      });
+
+    if (isActive) {
+      setProfile(savedProfile);
+      setActivities(todaysActivities);
+
+      setActiveSleep(
+        savedActiveSleep?.babyProfileId ===
+          savedProfile.id
+          ? savedActiveSleep
+          : null,
+      );
+    }
+  } catch (error) {
+    console.error(
+      'Unable to load home data:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to load today',
+      'Please close the app and try again.',
+    );
+  } finally {
+    if (isActive) {
+      setLoading(false);
+    }
+  }
+};
 
       loadHomeData();
 

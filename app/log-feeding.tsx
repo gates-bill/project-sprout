@@ -17,9 +17,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityDateTimeField from '../components/ActivityDateTimeField';
 import {
   addActivity,
+  BabyActivity,
   FeedingMethod,
 } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  syncActivityToCloud,
+} from '../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 const feedingMethods: FeedingMethod[] = [
   'Breast',
@@ -89,7 +95,7 @@ export default function LogFeedingScreen() {
       const createdAt = new Date().toISOString();
       const occurredAtIso = occurredAt.toISOString();
 
-      await addActivity({
+      const feedingActivity: BabyActivity = {
         id: Date.now().toString(),
         babyProfileId: profile.id,
         type: 'feeding',
@@ -100,8 +106,48 @@ export default function LogFeedingScreen() {
             : null,
         note: note.trim() || null,
         occurredAt: occurredAtIso,
-        createdAt: createdAt,
-      });
+        createdAt,
+      };
+
+      await addActivity(feedingActivity);
+
+try {
+  console.log('Starting feeding cloud sync');
+
+  const circle = await loadMyCareCircle();
+
+  console.log('Care circle:', circle);
+
+  if (circle) {
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        circle.id,
+      );
+
+    console.log('Cloud baby:', cloudBaby);
+
+    if (cloudBaby) {
+      await syncActivityToCloud(
+        feedingActivity,
+        cloudBaby.id,
+      );
+
+      console.log(
+        'Feeding cloud sync complete',
+      );
+    }
+  }
+} catch (syncError) {
+  console.warn(
+    'Feeding saved locally but could not sync:',
+    syncError,
+  );
+
+  Alert.alert(
+    'Saved on this device',
+    'The feeding was saved, but Sprout could not sync it with your Care Circle yet.',
+  );
+}
 
       router.back();
     } catch {

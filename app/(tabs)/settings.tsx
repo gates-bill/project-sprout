@@ -26,12 +26,7 @@ import {
   createCareCircleInvite,
 } from '../../lib/careCircleInvites';
 import {
-  downloadCloudActivities,
-  syncLocalActivitiesToCloud
-} from '../../lib/cloudActivities';
-import {
   createCloudBaby,
-  hydrateLocalBabyFromCloud,
   loadCloudBabyForCircle,
 } from '../../lib/cloudBaby';
 import {
@@ -56,14 +51,6 @@ export default function SettingsScreen() {
 
   const [deleting, setDeleting] =
     useState(false);
-
-  const [syncingActivities, setSyncingActivities] =
-    useState(false);
-
-  const [
-    downloadingActivities,
-    setDownloadingActivities,
-    ] = useState(false);
 
   const [creatingInvite, setCreatingInvite] =
     useState(false);
@@ -248,10 +235,13 @@ const handleCreateCloudBaby = async () => {
       profile,
     );
 
+    setCloudBabyId(babyId);
+
     Alert.alert(
       'Baby connected',
       `The baby profile is now stored in the shared care circle.\n\nID: ${babyId}`,
     );
+
   } catch (error) {
     console.error(
       'Unable to create cloud baby:',
@@ -266,103 +256,6 @@ const handleCreateCloudBaby = async () => {
     );
   } finally {
     setCreatingBaby(false);
-  }
-};
-
-const handleSyncActivities = async () => {
-  if (!cloudBabyId || syncingActivities) {
-    return;
-  }
-
-  setSyncingActivities(true);
-
-  try {
-    const count =
-      await syncLocalActivitiesToCloud(
-        cloudBabyId,
-      );
-
-    Alert.alert(
-      'Activities synced',
-      count === 0
-        ? 'There were no activities to sync.'
-        : `${count} ${
-            count === 1
-              ? 'activity'
-              : 'activities'
-          } synced to your care circle.`,
-    );
-  } catch (error) {
-    console.error(
-      'Unable to sync activities:',
-      error,
-    );
-
-    Alert.alert(
-      'Unable to sync activities',
-      error instanceof Error
-        ? error.message
-        : 'Please try again.',
-    );
-  } finally {
-    setSyncingActivities(false);
-  }
-};
-
-const handleDownloadActivities = async () => {
-  if (!cloudBabyId || !careCircleId || downloadingActivities) {
-    return;
-  }
-
-  setDownloadingActivities(true);
-
-  try {
-    let profile = await loadBabyProfile();
-
-    if (!profile) {
-      profile = await hydrateLocalBabyFromCloud(
-        careCircleId,
-      );
-    }
-
-    if (!profile) {
-      Alert.alert(
-        'Baby profile not found',
-        'Sprout could not load the shared baby profile.',
-      );
-      return;
-    }
-
-    const count =
-      await downloadCloudActivities(
-        cloudBabyId,
-        profile.id,
-      );
-
-    Alert.alert(
-      'Shared data downloaded',
-      count === 0
-        ? 'The shared baby profile is connected. There were no activities to download.'
-        : `The shared baby profile and ${count} ${
-            count === 1
-              ? 'activity'
-              : 'activities'
-          } are now available on this device.`,
-    );
-  } catch (error) {
-    console.error(
-      'Unable to download shared data:',
-      error,
-    );
-
-    Alert.alert(
-      'Unable to download shared data',
-      error instanceof Error
-        ? error.message
-        : 'Please try again.',
-    );
-  } finally {
-    setDownloadingActivities(false);
   }
 };
 
@@ -577,59 +470,17 @@ const handleSignOut = async () => {
         </Pressable>
       )}
 
-    {cloudBabyId && (
-      <View style={styles.babyStatus}>
-        <Text style={styles.statusTitle}>
-          Baby profile connected
-        </Text>
+{cloudBabyId && (
+  <View style={styles.babyStatus}>
+    <Text style={styles.statusTitle}>
+      Baby profile connected
+    </Text>
 
-        <Text style={styles.statusText}>
-          This baby is ready for shared activity syncing.
-        </Text>
-        <Pressable
-            accessibilityRole="button"
-            disabled={syncingActivities}
-            onPress={handleSyncActivities}
-            style={({ pressed }) => [
-            styles.actionButton,
-            styles.secondActionButton,
-            pressed && styles.pressed,
-            ]}
-        >
-            {syncingActivities ? (
-            <ActivityIndicator
-                color="#48684D"
-                size="small"
-            />
-            ) : (
-            <Text style={styles.actionText}>
-                Sync activity data
-            </Text>
-            )}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          disabled={downloadingActivities}
-          onPress={handleDownloadActivities}
-          style={({ pressed }) => [
-            styles.actionButton,
-            styles.secondActionButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          {downloadingActivities ? (
-            <ActivityIndicator
-              color="#48684D"
-              size="small"
-            />
-          ) : (
-            <Text style={styles.actionText}>
-              Download shared data
-            </Text>
-          )}
-        </Pressable>
-      </View>
-    )}
+    <Text style={styles.statusText}>
+      Shared activity data syncs automatically with your Care Circle.
+    </Text>
+  </View>
+)}
     {careCircleId && (
   <Pressable
     accessibilityRole="button"
@@ -686,7 +537,8 @@ const handleSignOut = async () => {
 
         </View>
 
-
+{signedInEmail && !careCircleId && (
+  <>
 <Text style={styles.sectionTitle}>
   Join a care circle
 </Text>
@@ -735,8 +587,8 @@ const handleSignOut = async () => {
     )}
   </Pressable>
 </View>
-
-
+</>
+)}
         <Text style={styles.sectionTitle}>
           Your data
         </Text>

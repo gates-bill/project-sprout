@@ -15,8 +15,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ActivityDateTimeField from '../components/ActivityDateTimeField';
-import { addActivity } from '../lib/activities';
+import {
+  addActivity,
+  BabyActivity,
+} from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  syncActivityToCloud,
+} from '../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 export default function LogNoteScreen() {
   const router = useRouter();
@@ -56,18 +64,48 @@ export default function LogNoteScreen() {
       }
 
       const createdAt = new Date().toISOString();
-      const occurredAtIso = occurredAt.toISOString();
+const occurredAtIso = occurredAt.toISOString();
 
-      await addActivity({
-        id: Date.now().toString(),
-        babyProfileId: profile.id,
-        type: 'note',
-        note: note.trim(),
-        occurredAt: occurredAtIso,
-      createdAt,
-      });
+const noteActivity: BabyActivity = {
+  id: Date.now().toString(),
+  babyProfileId: profile.id,
+  type: 'note',
+  note: note.trim(),
+  occurredAt: occurredAtIso,
+  createdAt,
+};
 
-      router.back();
+await addActivity(noteActivity);
+
+try {
+  const circle = await loadMyCareCircle();
+
+  if (circle) {
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        circle.id,
+      );
+
+    if (cloudBaby) {
+      await syncActivityToCloud(
+        noteActivity,
+        cloudBaby.id,
+      );
+    }
+  }
+} catch (syncError) {
+  console.warn(
+    'Note saved locally but could not sync:',
+    syncError,
+  );
+
+  Alert.alert(
+    'Saved on this device',
+    'The note was saved, but Sprout could not sync it with your Care Circle yet.',
+  );
+}
+
+router.back();
     } catch (error) {
       console.error('Unable to save note:', error);
 

@@ -17,9 +17,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityDateTimeField from '../components/ActivityDateTimeField';
 import {
   addActivity,
+  BabyActivity,
   DiaperType,
 } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  syncActivityToCloud,
+} from '../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 const diaperTypes: {
   type: DiaperType;
@@ -71,20 +77,50 @@ export default function LogDiaperScreen() {
         return;
       }
 
-      const createdAt = new Date().toISOString();
-      const occurredAtIso = occurredAt.toISOString();
+const createdAt = new Date().toISOString();
+const occurredAtIso = occurredAt.toISOString();
 
-      await addActivity({
-        id: Date.now().toString(),
-        babyProfileId: profile.id,
-        type: 'diaper',
-        diaperType,
-        note: note.trim() || null,
-        occurredAt: occurredAtIso,
-        createdAt,
-      });
+const diaperActivity: BabyActivity = {
+  id: Date.now().toString(),
+  babyProfileId: profile.id,
+  type: 'diaper',
+  diaperType,
+  note: note.trim() || null,
+  occurredAt: occurredAtIso,
+  createdAt,
+};
 
-      router.back();
+await addActivity(diaperActivity);
+
+try {
+  const circle = await loadMyCareCircle();
+
+  if (circle) {
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        circle.id,
+      );
+
+    if (cloudBaby) {
+      await syncActivityToCloud(
+        diaperActivity,
+        cloudBaby.id,
+      );
+    }
+  }
+} catch (syncError) {
+  console.warn(
+    'Diaper saved locally but could not sync:',
+    syncError,
+  );
+
+  Alert.alert(
+    'Saved on this device',
+    'The diaper entry was saved, but Sprout could not sync it with your Care Circle yet.',
+  );
+}
+
+router.back();
     } catch (error) {
       console.error('Unable to save diaper:', error);
 

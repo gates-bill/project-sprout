@@ -22,6 +22,11 @@ import {
   loadActivities,
 } from '../../lib/activities';
 import { loadBabyProfile } from '../../lib/babyProfile';
+import { loadMyCareCircle } from '../../lib/careCircle';
+import {
+  downloadCloudActivities,
+} from '../../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 
 type ActivityGroup = {
   dateKey: string;
@@ -40,53 +45,75 @@ export default function HistoryScreen() {
     useCallback(() => {
       let isActive = true;
 
-      const loadHistory = async () => {
-        setLoading(true);
+const loadHistory = async () => {
+  setLoading(true);
 
-        try {
-          const [
-            profile,
-            savedActivities,
-          ] = await Promise.all([
-            loadBabyProfile(),
-            loadActivities(),
-          ]);
+  try {
+    const profile =
+      await loadBabyProfile();
 
-          if (!profile) {
-            router.replace('/');
-            return;
-          }
+    if (!profile) {
+      router.replace('/');
+      return;
+    }
 
-          const profileActivities =
-            savedActivities.filter(
-              (activity) =>
-                activity.babyProfileId === profile.id,
-            );
+    try {
+      const circle =
+        await loadMyCareCircle();
 
-          const activityGroups =
-            groupActivitiesByDate(
-              profileActivities,
-            );
-
-          if (isActive) {
-            setGroups(activityGroups);
-          }
-        } catch (error) {
-          console.error(
-            'Unable to load history:',
-            error,
+      if (circle) {
+        const cloudBaby =
+          await loadCloudBabyForCircle(
+            circle.id,
           );
 
-          Alert.alert(
-            'Unable to load history',
-            'Please go back and try again.',
+        if (cloudBaby) {
+          await downloadCloudActivities(
+            cloudBaby.id,
+            profile.id,
           );
-        } finally {
-          if (isActive) {
-            setLoading(false);
-          }
         }
-      };
+      }
+    } catch (syncError) {
+      console.warn(
+        'Unable to refresh shared history:',
+        syncError,
+      );
+    }
+
+    const savedActivities =
+      await loadActivities();
+
+    const profileActivities =
+      savedActivities.filter(
+        (activity) =>
+          activity.babyProfileId === profile.id,
+      );
+
+    const activityGroups =
+      groupActivitiesByDate(
+        profileActivities,
+      );
+
+    if (isActive) {
+      setGroups(activityGroups);
+    }
+  } catch (error) {
+    console.error(
+      'Unable to load history:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to load history',
+      'Please go back and try again.',
+    );
+  } finally {
+    if (isActive) {
+      setLoading(false);
+    }
+  }
+};
 
       loadHistory();
 

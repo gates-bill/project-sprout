@@ -14,8 +14,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { addActivity } from '../lib/activities';
+import {
+  addActivity,
+  BabyActivity,
+} from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  syncActivityToCloud,
+} from '../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 import {
   ActiveSleepSession,
   clearActiveSleepSession,
@@ -168,21 +176,51 @@ export default function LogSleepScreen() {
 
       const endedAtIso = endedAt.toISOString();
 
-      await addActivity({
-        id: Date.now().toString(),
-        babyProfileId: activeSleep.babyProfileId,
-        type: 'sleep',
-        startedAt: activeSleep.startedAt,
-        endedAt: endedAtIso,
-        durationMinutes,
-        note: note.trim() || null,
-        occurredAt: endedAtIso,
-        createdAt: endedAtIso,
-      });
+const sleepActivity: BabyActivity = {
+  id: Date.now().toString(),
+  babyProfileId: activeSleep.babyProfileId,
+  type: 'sleep',
+  startedAt: activeSleep.startedAt,
+  endedAt: endedAtIso,
+  durationMinutes,
+  note: note.trim() || null,
+  occurredAt: endedAtIso,
+  createdAt: endedAtIso,
+};
 
-      await clearActiveSleepSession();
+await addActivity(sleepActivity);
 
-      router.back();
+try {
+  const circle = await loadMyCareCircle();
+
+  if (circle) {
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        circle.id,
+      );
+
+    if (cloudBaby) {
+      await syncActivityToCloud(
+        sleepActivity,
+        cloudBaby.id,
+      );
+    }
+  }
+} catch (syncError) {
+  console.warn(
+    'Sleep saved locally but could not sync:',
+    syncError,
+  );
+
+  Alert.alert(
+    'Saved on this device',
+    'The sleep entry was saved, but Sprout could not sync it with your Care Circle yet.',
+  );
+}
+
+await clearActiveSleepSession();
+
+router.back();
     } catch (error) {
       console.error('Unable to end sleep:', error);
 

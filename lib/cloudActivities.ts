@@ -1,9 +1,9 @@
 import {
-    BabyActivity,
-    DiaperType,
-    FeedingMethod,
-    loadActivities,
-    mergeActivities,
+  BabyActivity,
+  DiaperType,
+  FeedingMethod,
+  loadActivities,
+  mergeActivities,
 } from './activities';
 import { getCurrentSession } from './auth';
 import { supabase } from './supabase';
@@ -72,31 +72,126 @@ export async function syncLocalActivitiesToCloud(
     );
   }
 
-  const activities = await loadActivities();
+  const activities =
+    await loadActivities();
 
   if (activities.length === 0) {
     return 0;
   }
 
-  const rows = activities.map((activity) =>
-    activityToCloudRow(
+  for (const activity of activities) {
+    const row = activityToCloudRow(
       activity,
       babyId,
       user.id,
-    ),
-  );
+    );
 
-  const { error } = await supabase
-    .from('activities')
-    .upsert(rows, {
-      onConflict: 'baby_id,client_id',
-    });
+    const { data: existing, error: lookupError } =
+      await supabase
+        .from('activities')
+        .select('id')
+        .eq('baby_id', babyId)
+        .eq('client_id', activity.id)
+        .maybeSingle();
 
-  if (error) {
-    throw error;
+    if (lookupError) {
+      throw lookupError;
+    }
+
+    if (existing) {
+      const {
+        created_by: _createdBy,
+        created_at: _createdAt,
+        ...updateRow
+      } = row;
+
+      const { error: updateError } =
+        await supabase
+          .from('activities')
+          .update(updateRow)
+          .eq('baby_id', babyId)
+          .eq('client_id', activity.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+    } else {
+      const { error: insertError } =
+        await supabase
+          .from('activities')
+          .insert(row);
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
   }
 
-  return rows.length;
+  return activities.length;
+}
+
+export async function syncActivityToCloud(
+  activity: BabyActivity,
+  babyId: string,
+): Promise<void> {
+  const { data: sessionData } =
+    await getCurrentSession();
+
+  const user = sessionData.session?.user;
+
+  if (!user) {
+    throw new Error(
+      'You must be signed in before syncing.',
+    );
+  }
+
+  const row = activityToCloudRow(
+    activity,
+    babyId,
+    user.id,
+  );
+
+  const { data: existing, error: lookupError } =
+    await supabase
+      .from('activities')
+      .select('id')
+      .eq('baby_id', babyId)
+      .eq('client_id', activity.id)
+      .maybeSingle();
+
+  if (lookupError) {
+    throw lookupError;
+  }
+
+  if (existing) {
+    const {
+      created_by: _createdBy,
+      created_at: _createdAt,
+      ...updateRow
+    } = row;
+
+    const { error: updateError } =
+      await supabase
+        .from('activities')
+        .update(updateRow)
+        .eq('baby_id', babyId)
+        .eq('client_id', activity.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return;
+  }
+
+  const { error: insertError } =
+    await supabase
+      .from('activities')
+      .insert(row);
+
+  if (insertError) {
+    throw insertError;
+  }
 }
 
 type CloudActivityRow = {
@@ -274,4 +369,26 @@ export async function downloadCloudActivities(
   await mergeActivities(activities);
 
   return activities.length;
+}
+
+export async function deleteCloudActivity(
+  babyId: string,
+  clientId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('activities')
+    .delete()
+    .eq('baby_id', babyId)
+    .eq('client_id', clientId)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      'This shared activity could not be deleted. It may have been created by another caregiver.',
+    );
+  }
 }

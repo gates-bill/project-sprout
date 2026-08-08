@@ -25,6 +25,11 @@ import {
   loadActivityById,
   updateActivity,
 } from '../lib/activities';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  syncActivityToCloud,
+} from '../lib/cloudActivities';
+import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 const feedingMethods: FeedingMethod[] = [
   'Breast',
@@ -239,78 +244,107 @@ export default function EditActivityScreen() {
       }
     }
 
-    setSaving(true);
+setSaving(true);
 
-    try {
-      switch (activity.type) {
-        case 'feeding':
-          await updateActivity({
-            ...activity,
-            feedingMethod,
-            amountOz:
-              feedingMethod === 'Bottle'
-                ? parsedAmount
-                : null,
-            note: note.trim() || null,
-            occurredAt: occurredAt.toISOString(),
-          });
-          break;
+try {
+  let updatedActivity: BabyActivity;
 
-        case 'diaper':
-          await updateActivity({
-            ...activity,
-            diaperType,
-            note: note.trim() || null,
-            occurredAt: occurredAt.toISOString(),
-          });
-          break;
+  switch (activity.type) {
+    case 'feeding':
+      updatedActivity = {
+        ...activity,
+        feedingMethod,
+        amountOz:
+          feedingMethod === 'Bottle'
+            ? parsedAmount
+            : null,
+        note: note.trim() || null,
+        occurredAt:
+          occurredAt.toISOString(),
+      };
+      break;
 
-        case 'sleep': {
-          const durationMinutes = Math.max(
-            1,
-            Math.round(
-              (endedAt.getTime() -
-                startedAt.getTime()) /
-                60000,
-            ),
-          );
+    case 'diaper':
+      updatedActivity = {
+        ...activity,
+        diaperType,
+        note: note.trim() || null,
+        occurredAt:
+          occurredAt.toISOString(),
+      };
+      break;
 
-          await updateActivity({
-            ...activity,
-            startedAt: startedAt.toISOString(),
-            endedAt: endedAt.toISOString(),
-            durationMinutes,
-            occurredAt: endedAt.toISOString(),
-            note: note.trim() || null,
-          });
+    case 'sleep': {
+      const durationMinutes = Math.max(
+        1,
+        Math.round(
+          (endedAt.getTime() -
+            startedAt.getTime()) /
+            60000,
+        ),
+      );
 
-          break;
-        }
+      updatedActivity = {
+        ...activity,
+        startedAt:
+          startedAt.toISOString(),
+        endedAt:
+          endedAt.toISOString(),
+        durationMinutes,
+        occurredAt:
+          endedAt.toISOString(),
+        note: note.trim() || null,
+      };
 
-        case 'note': {
-          const trimmedNote = note.trim();
+      break;
+    }
 
-          if (!trimmedNote) {
-            Alert.alert(
-              'Note required',
-              'Enter something before saving.',
-            );
+    case 'note': {
+      const trimmedNote = note.trim();
 
-            setSaving(false);
-            return;
-          }
+      if (!trimmedNote) {
+        Alert.alert(
+          'Note required',
+          'Enter something before saving.',
+        );
 
-          await updateActivity({
-            ...activity,
-            note: trimmedNote,
-            occurredAt: occurredAt.toISOString(),
-          });
-
-          break;
-        }
+        setSaving(false);
+        return;
       }
 
-      router.back();
+      updatedActivity = {
+        ...activity,
+        note: trimmedNote,
+        occurredAt:
+          occurredAt.toISOString(),
+      };
+
+      break;
+    }
+  }
+
+  const circle =
+    await loadMyCareCircle();
+
+  if (circle) {
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        circle.id,
+      );
+
+    if (cloudBaby) {
+      await syncActivityToCloud(
+        updatedActivity,
+        cloudBaby.id,
+      );
+    }
+  }
+
+  await updateActivity(
+    updatedActivity,
+  );
+
+  router.back();
     } catch (error) {
       console.error(
         'Unable to update activity:',
