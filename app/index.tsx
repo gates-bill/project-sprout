@@ -8,7 +8,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getCurrentSession } from '../lib/auth';
 import { loadBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import { hydrateLocalBabyFromCloud } from '../lib/cloudBaby';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -20,14 +23,40 @@ useEffect(() => {
 
   const checkForSavedProfile = async () => {
     try {
-      const savedProfile = await loadBabyProfile();
+      const savedProfile =
+        await loadBabyProfile();
 
       if (savedProfile) {
         router.replace('/home');
         return;
       }
-    } catch {
-      // Show the welcome screen if the stored profile cannot be read.
+
+      const { data } =
+        await getCurrentSession();
+
+      const session = data.session;
+
+      if (session) {
+        const circle =
+          await loadMyCareCircle();
+
+        if (circle) {
+          const hydratedProfile =
+            await hydrateLocalBabyFromCloud(
+              circle.id,
+            );
+
+          if (hydratedProfile) {
+            router.replace('/home');
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(
+        'Unable to check Sprout startup state:',
+        error,
+      );
     }
 
     if (isMounted) {
@@ -98,16 +127,18 @@ if (checkingProfile) {
         </View>
 
         <View style={styles.footer}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/create-profile')}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.primaryButtonPressed,
-            ]}
-          >
-            <Text style={styles.primaryButtonText}>Create baby profile</Text>
-          </Pressable>
+<Pressable
+  accessibilityRole="button"
+  onPress={() => router.push('/auth')}
+  style={({ pressed }) => [
+    styles.signInButton,
+    pressed && styles.primaryButtonPressed,
+  ]}
+>
+  <Text style={styles.signInButtonText}>
+    Sign in to shared care
+  </Text>
+</Pressable>
 
           <Text style={styles.placeholderNote}>
             Project Sprout is our temporary working name.
@@ -268,4 +299,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  signInButton: {
+  minHeight: 54,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderColor: '#C9D6C5',
+  borderRadius: 18,
+  borderWidth: 1,
+  backgroundColor: '#FFFEFA',
+  marginTop: 10,
+},
+signInButtonText: {
+  color: '#48684D',
+  fontSize: 16,
+  fontWeight: '700',
+},
 });
