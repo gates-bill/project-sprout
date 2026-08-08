@@ -7,16 +7,24 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { getCurrentSession } from '../../lib/auth';
+import {
+  getCurrentSession,
+  signOut
+} from '../../lib/auth';
 import { loadBabyProfile } from '../../lib/babyProfile';
 import {
   createCareCircle,
   loadMyCareCircle,
 } from '../../lib/careCircle';
+import {
+  acceptCareCircleInvite,
+  createCareCircleInvite,
+} from '../../lib/careCircleInvites';
 import {
   downloadCloudActivities,
   syncLocalActivitiesToCloud
@@ -55,6 +63,15 @@ export default function SettingsScreen() {
     downloadingActivities,
     setDownloadingActivities,
     ] = useState(false);
+
+  const [creatingInvite, setCreatingInvite] =
+    useState(false);
+
+  const [joiningCircle, setJoiningCircle] =
+    useState(false);
+
+  const [inviteCode, setInviteCode] =
+    useState('');
 
   const handleExport = async () => {
     if (exporting) {
@@ -342,6 +359,123 @@ const handleDownloadActivities = async () => {
   }
 };
 
+const handleCreateInvite = async () => {
+  if (!careCircleId || creatingInvite) {
+    return;
+  }
+
+  setCreatingInvite(true);
+
+  try {
+    const code =
+      await createCareCircleInvite(
+        careCircleId,
+      );
+
+    Alert.alert(
+      'Invite created',
+      `Share this code with the caregiver you want to invite:\n\n${code}`,
+    );
+  } catch (error) {
+    console.error(
+      'Unable to create invite:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to create invite',
+      error instanceof Error
+        ? error.message
+        : 'Please try again.',
+    );
+  } finally {
+    setCreatingInvite(false);
+  }
+};
+
+const handleJoinCircle = async () => {
+  if (
+    !inviteCode.trim() ||
+    joiningCircle
+  ) {
+    return;
+  }
+
+  setJoiningCircle(true);
+
+  try {
+    const joinedCircleId =
+      await acceptCareCircleInvite(
+        inviteCode,
+      );
+
+    setCareCircleId(joinedCircleId);
+
+    const cloudBaby =
+      await loadCloudBabyForCircle(
+        joinedCircleId,
+      );
+
+    setCloudBabyId(
+      cloudBaby?.id ?? null,
+    );
+
+    setInviteCode('');
+
+    Alert.alert(
+      'Care circle joined',
+      'You are now connected to the shared baby care circle.',
+    );
+  } catch (error) {
+    console.error(
+      'Unable to join care circle:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to join care circle',
+      error instanceof Error
+        ? error.message
+        : 'Check the invite code and try again.',
+    );
+  } finally {
+    setJoiningCircle(false);
+  }
+};
+
+const handleSignOut = async () => {
+  try {
+    const { error } = await signOut();
+
+    if (error) {
+      Alert.alert(
+        'Unable to sign out',
+        error.message,
+      );
+      return;
+    }
+
+    setSignedInEmail(null);
+    setCareCircleId(null);
+    setCloudBabyId(null);
+
+    Alert.alert(
+      'Signed out',
+      'You are now signed out of Sprout.',
+    );
+  } catch (error) {
+    console.error(
+      'Unable to sign out:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to sign out',
+      'Please try again.',
+    );
+  }
+};
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -489,6 +623,29 @@ const handleDownloadActivities = async () => {
         </Pressable>
       </View>
     )}
+    {careCircleId && (
+  <Pressable
+    accessibilityRole="button"
+    disabled={creatingInvite}
+    onPress={handleCreateInvite}
+    style={({ pressed }) => [
+      styles.actionButton,
+      styles.secondActionButton,
+      pressed && styles.pressed,
+    ]}
+  >
+    {creatingInvite ? (
+      <ActivityIndicator
+        color="#48684D"
+        size="small"
+      />
+    ) : (
+      <Text style={styles.actionText}>
+        Invite caregiver
+      </Text>
+    )}
+  </Pressable>
+)}
   </>
 ) : (
   <Pressable
@@ -504,7 +661,74 @@ const handleDownloadActivities = async () => {
     </Text>
   </Pressable>
 )}
+
+{signedInEmail && (
+  <Pressable
+    accessibilityRole="button"
+    onPress={handleSignOut}
+    style={({ pressed }) => [
+      styles.signOutButton,
+      pressed && styles.pressed,
+    ]}
+  >
+    <Text style={styles.signOutButtonText}>
+      Sign out
+    </Text>
+  </Pressable>
+)}
+
         </View>
+
+
+<Text style={styles.sectionTitle}>
+  Join a care circle
+</Text>
+
+<View style={styles.card}>
+  <Text style={styles.cardTitle}>
+    Have an invite code?
+  </Text>
+
+  <Text style={styles.cardText}>
+    Enter the code another caregiver shared with you.
+  </Text>
+
+  <TextInput
+    autoCapitalize="none"
+    autoCorrect={false}
+    onChangeText={setInviteCode}
+    placeholder="Invite code"
+    placeholderTextColor="#9AA29B"
+    style={styles.inviteInput}
+    value={inviteCode}
+  />
+
+  <Pressable
+    accessibilityRole="button"
+    disabled={
+      joiningCircle ||
+      !inviteCode.trim()
+    }
+    onPress={handleJoinCircle}
+    style={({ pressed }) => [
+      styles.actionButton,
+      styles.secondActionButton,
+      pressed && styles.pressed,
+    ]}
+  >
+    {joiningCircle ? (
+      <ActivityIndicator
+        color="#48684D"
+        size="small"
+      />
+    ) : (
+      <Text style={styles.actionText}>
+        Join care circle
+      </Text>
+    )}
+  </Pressable>
+</View>
+
 
         <Text style={styles.sectionTitle}>
           Your data
@@ -666,6 +890,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  inviteInput: {
+    minHeight: 52,
+    color: '#263B2B',
+    fontSize: 15,
+    borderColor: '#DDE3DA',
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: '#FFFEFA',
+    marginTop: 16,
+    paddingHorizontal: 15,
+  },
   privacyCard: {
     borderColor: '#DDE5D9',
     borderRadius: 20,
@@ -756,5 +991,19 @@ statusText: {
   fontSize: 13,
   lineHeight: 19,
   marginTop: 5,
+},
+signOutButton: {
+  minHeight: 48,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderColor: '#D8DCD5',
+  borderRadius: 14,
+  borderWidth: 1,
+  marginTop: 12,
+},
+signOutButtonText: {
+  color: '#667068',
+  fontSize: 15,
+  fontWeight: '700',
 },
 });
