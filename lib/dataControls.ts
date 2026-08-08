@@ -4,6 +4,9 @@ import * as Sharing from 'expo-sharing';
 
 import { loadActivities } from './activities';
 import { loadBabyProfile } from './babyProfile';
+import {
+  clearAllProfilePhotos,
+} from './profilePhoto';
 import { loadActiveSleepSession } from './sleepSession';
 
 const SPROUT_STORAGE_PREFIX = '@project-sprout/';
@@ -57,17 +60,21 @@ export async function exportSproutData(): Promise<void> {
   await Sharing.shareAsync(file.uri);
 }
 
-export async function deleteAllSproutData():
-  Promise<void> {
+export async function deleteAllSproutData(): Promise<void> {
   const keys = await AsyncStorage.getAllKeys();
 
   const sproutKeys = keys.filter((key) =>
     key.startsWith(SPROUT_STORAGE_PREFIX),
   );
 
-  if (sproutKeys.length === 0) {
-    return;
+  if (sproutKeys.length > 0) {
+    await AsyncStorage.multiRemove(
+      sproutKeys,
+    );
   }
 
-  await AsyncStorage.multiRemove(sproutKeys);
+  const remainingKeys =
+    await AsyncStorage.getAllKeys();
+
+  clearAllProfilePhotos();
 }

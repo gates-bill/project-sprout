@@ -355,13 +355,17 @@ const handleSignOut = async () => {
       return;
     }
 
+    await deleteAllSproutData();
+
     setSignedInEmail(null);
     setCareCircleId(null);
     setCloudBabyId(null);
 
+    router.replace('/');
+
     Alert.alert(
       'Signed out',
-      'You are now signed out of Sprout.',
+      'You are signed out and this device’s local Sprout data has been cleared.',
     );
   } catch (error) {
     console.error(
