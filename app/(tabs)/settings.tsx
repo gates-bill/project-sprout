@@ -5,6 +5,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import * as Clipboard from 'expo-clipboard';
 import {
   getCurrentSession,
   signOut
@@ -60,6 +62,9 @@ export default function SettingsScreen() {
 
   const [inviteCode, setInviteCode] =
     useState('');
+
+  const [generatedInviteCode, setGeneratedInviteCode] =
+    useState<string | null>(null);
 
   const handleExport = async () => {
     if (exporting) {
@@ -272,10 +277,7 @@ const handleCreateInvite = async () => {
         careCircleId,
       );
 
-    Alert.alert(
-      'Invite created',
-      `Share this code with the caregiver you want to invite:\n\n${code}`,
-    );
+    setGeneratedInviteCode(code);
   } catch (error) {
     console.error(
       'Unable to create invite:',
@@ -376,6 +378,45 @@ const handleSignOut = async () => {
     Alert.alert(
       'Unable to sign out',
       'Please try again.',
+    );
+  }
+};
+
+const handleCopyInvite = async () => {
+  if (!generatedInviteCode) {
+    return;
+  }
+
+  await Clipboard.setStringAsync(
+    generatedInviteCode,
+  );
+
+  Alert.alert(
+    'Invite copied',
+    'The invite code is ready to paste.',
+  );
+};
+
+const handleShareInvite = async () => {
+  if (!generatedInviteCode) {
+    return;
+  }
+
+  try {
+    await Share.share({
+      message:
+        `Join my Sprout Care Circle.\n\n` +
+        `Invite code:\n${generatedInviteCode}`,
+    });
+  } catch (error) {
+    console.error(
+      'Unable to share invite:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to share invite',
+      'Please copy the invite code instead.',
     );
   }
 };
@@ -507,6 +548,54 @@ const handleSignOut = async () => {
       </Text>
     )}
   </Pressable>
+)}
+{generatedInviteCode && (
+  <View style={styles.inviteCard}>
+    <Text style={styles.inviteCardTitle}>
+      Caregiver invite
+    </Text>
+
+    <Text style={styles.inviteCardText}>
+      Share this code with the caregiver you want to invite.
+    </Text>
+
+    <View style={styles.inviteCodeBox}>
+      <Text
+        selectable
+        style={styles.inviteCodeText}
+      >
+        {generatedInviteCode}
+      </Text>
+    </View>
+
+    <View style={styles.inviteActions}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={handleCopyInvite}
+        style={({ pressed }) => [
+          styles.inviteActionButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.inviteActionText}>
+          Copy code
+        </Text>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={handleShareInvite}
+        style={({ pressed }) => [
+          styles.inviteActionButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.inviteActionText}>
+          Share invite
+        </Text>
+      </Pressable>
+    </View>
+  </View>
 )}
   </>
 ) : (
@@ -867,6 +956,60 @@ signOutButton: {
 signOutButtonText: {
   color: '#667068',
   fontSize: 15,
+  fontWeight: '700',
+},
+inviteCard: {
+  borderColor: '#D7E1D3',
+  borderRadius: 16,
+  borderWidth: 1,
+  backgroundColor: '#F7FAF5',
+  marginTop: 12,
+  padding: 16,
+},
+inviteCardTitle: {
+  color: '#304435',
+  fontSize: 15,
+  fontWeight: '700',
+},
+inviteCardText: {
+  color: '#657569',
+  fontSize: 13,
+  lineHeight: 19,
+  marginTop: 5,
+},
+inviteCodeBox: {
+  borderColor: '#DDE3DA',
+  borderRadius: 12,
+  borderWidth: 1,
+  backgroundColor: '#FFFFFF',
+  marginTop: 14,
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+},
+inviteCodeText: {
+  color: '#304435',
+  fontSize: 14,
+  fontWeight: '600',
+  textAlign: 'center',
+},
+inviteActions: {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 12,
+},
+inviteActionButton: {
+  flex: 1,
+  minHeight: 46,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderColor: '#C9D6C5',
+  borderRadius: 12,
+  borderWidth: 1,
+  backgroundColor: '#EBF0E7',
+},
+inviteActionText: {
+  color: '#48684D',
+  fontSize: 14,
   fontWeight: '700',
 },
 });
