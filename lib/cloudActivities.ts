@@ -3,7 +3,9 @@ import {
   DiaperType,
   FeedingMethod,
   loadActivities,
-  mergeActivities,
+  markActivityPending,
+  markActivitySynced,
+  reconcileActivitiesWithCloud
 } from './activities';
 import { getCurrentSession } from './auth';
 import { supabase } from './supabase';
@@ -86,13 +88,15 @@ export async function syncLocalActivitiesToCloud(
       user.id,
     );
 
-    const { data: existing, error: lookupError } =
-      await supabase
-        .from('activities')
-        .select('id')
-        .eq('baby_id', babyId)
-        .eq('client_id', activity.id)
-        .maybeSingle();
+    const {
+      data: existing,
+      error: lookupError,
+    } = await supabase
+      .from('activities')
+      .select('id')
+      .eq('baby_id', babyId)
+      .eq('client_id', activity.id)
+      .maybeSingle();
 
     if (lookupError) {
       throw lookupError;
@@ -125,6 +129,10 @@ export async function syncLocalActivitiesToCloud(
         throw insertError;
       }
     }
+
+    await markActivitySynced(
+      activity.id,
+    );
   }
 
   return activities.length;
@@ -145,19 +153,25 @@ export async function syncActivityToCloud(
     );
   }
 
+  await markActivityPending(
+    activity.id,
+  );
+
   const row = activityToCloudRow(
     activity,
     babyId,
     user.id,
   );
 
-  const { data: existing, error: lookupError } =
-    await supabase
-      .from('activities')
-      .select('id')
-      .eq('baby_id', babyId)
-      .eq('client_id', activity.id)
-      .maybeSingle();
+  const {
+    data: existing,
+    error: lookupError,
+  } = await supabase
+    .from('activities')
+    .select('id')
+    .eq('baby_id', babyId)
+    .eq('client_id', activity.id)
+    .maybeSingle();
 
   if (lookupError) {
     throw lookupError;
@@ -181,6 +195,10 @@ export async function syncActivityToCloud(
       throw updateError;
     }
 
+    await markActivitySynced(
+      activity.id,
+    );
+
     return;
   }
 
@@ -192,6 +210,10 @@ export async function syncActivityToCloud(
   if (insertError) {
     throw insertError;
   }
+
+  await markActivitySynced(
+    activity.id,
+  );
 }
 
 type CloudActivityRow = {
@@ -275,6 +297,7 @@ function cloudRowToActivity(
           row.feeding_method,
         amountOz: row.amount_oz,
         note: row.note,
+        syncStatus: 'synced',
       };
 
     case 'diaper':
@@ -294,6 +317,7 @@ function cloudRowToActivity(
         diaperType:
           row.diaper_type,
         note: row.note,
+        syncStatus: 'synced',
       };
 
     case 'sleep':
@@ -315,6 +339,7 @@ function cloudRowToActivity(
         durationMinutes:
           row.duration_minutes,
         note: row.note,
+        syncStatus: 'synced',
       };
 
     case 'note':
@@ -322,6 +347,7 @@ function cloudRowToActivity(
         ...base,
         type: 'note',
         note: row.note ?? '',
+        syncStatus: 'synced',
       };
   }
 }
@@ -366,7 +392,10 @@ export async function downloadCloudActivities(
       ),
     );
 
-  await mergeActivities(activities);
+await reconcileActivitiesWithCloud(
+  activities,
+  localBabyProfileId,
+);
 
   return activities.length;
 }
@@ -375,12 +404,13 @@ export async function deleteCloudActivity(
   babyId: string,
   clientId: string,
 ): Promise<void> {
-  const { data, error } = await supabase
-    .from('activities')
-    .delete()
-    .eq('baby_id', babyId)
-    .eq('client_id', clientId)
-    .select('id');
+  const { data, error } =
+    await supabase
+      .from('activities')
+      .delete()
+      .eq('baby_id', babyId)
+      .eq('client_id', clientId)
+      .select('id');
 
   if (error) {
     throw error;
@@ -388,7 +418,7 @@ export async function deleteCloudActivity(
 
   if (!data || data.length === 0) {
     throw new Error(
-      'This shared activity could not be deleted. It may have been created by another caregiver.',
+      'This shared activity could not be deleted.',
     );
   }
 }

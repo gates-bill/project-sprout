@@ -20,6 +20,7 @@ type BaseActivity = {
   note: string | null;
   occurredAt: string;
   createdAt: string;
+  syncStatus?: 'pending' | 'synced';
 };
 
 export type FeedingActivity =
@@ -126,8 +127,14 @@ export async function addActivity(
   const existingActivities =
     await loadActivities();
 
+  const pendingActivity: BabyActivity = {
+    ...activity,
+    syncStatus:
+      activity.syncStatus ?? 'pending',
+  };
+
   const updatedActivities: BabyActivity[] = [
-    activity,
+    pendingActivity,
     ...existingActivities,
   ];
 
@@ -189,6 +196,111 @@ export async function updateActivity(
   await saveActivities(updatedActivities);
 }
 
+export async function markActivitySynced(
+  activityId: string,
+): Promise<void> {
+  const activities = await loadActivities();
+
+  const updatedActivities =
+    activities.map((activity) =>
+      activity.id === activityId
+        ? {
+            ...activity,
+            syncStatus: 'synced' as const,
+          }
+        : activity,
+    );
+
+  await saveActivities(updatedActivities);
+}
+
+export async function markActivityPending(
+  activityId: string,
+): Promise<void> {
+  const activities = await loadActivities();
+
+  const updatedActivities =
+    activities.map((activity) =>
+      activity.id === activityId
+        ? {
+            ...activity,
+            syncStatus: 'pending' as const,
+          }
+        : activity,
+    );
+
+  await saveActivities(updatedActivities);
+}
+
+export async function reconcileActivitiesWithCloud(
+  cloudActivities: BabyActivity[],
+  babyProfileId: string,
+): Promise<void> {
+  const existingActivities =
+    await loadActivities();
+
+  const cloudActivityIds = new Set(
+    cloudActivities.map(
+      (activity) => activity.id,
+    ),
+  );
+
+  const retainedActivities =
+    existingActivities.filter(
+      (activity) => {
+        if (
+          activity.babyProfileId !==
+          babyProfileId
+        ) {
+          return true;
+        }
+
+        if (
+          activity.syncStatus ===
+          'pending'
+        ) {
+          return true;
+        }
+
+        return cloudActivityIds.has(
+          activity.id,
+        );
+      },
+    );
+
+  const activityMap = new Map<
+    string,
+    BabyActivity
+  >();
+
+  retainedActivities.forEach(
+    (activity) => {
+      activityMap.set(
+        activity.id,
+        activity,
+      );
+    },
+  );
+
+  cloudActivities.forEach(
+    (activity) => {
+      activityMap.set(
+        activity.id,
+        {
+          ...activity,
+          syncStatus: 'synced',
+        },
+      );
+    },
+  );
+
+  await saveActivities(
+    Array.from(
+      activityMap.values(),
+    ),
+  );
+}
+
 export async function mergeActivities(
   incomingActivities: BabyActivity[],
 ): Promise<number> {
@@ -209,14 +321,17 @@ export async function mergeActivities(
     },
   );
 
-  incomingActivities.forEach(
-    (activity) => {
-      activityMap.set(
-        activity.id,
-        activity,
-      );
-    },
-  );
+incomingActivities.forEach(
+  (activity) => {
+    activityMap.set(
+      activity.id,
+      {
+        ...activity,
+        syncStatus: 'synced',
+      },
+    );
+  },
+);
 
   const mergedActivities =
     Array.from(activityMap.values());
