@@ -1,30 +1,33 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getCurrentSession } from '../../lib/auth';
 import { loadBabyProfile } from '../../lib/babyProfile';
 import {
-    createCareCircle,
-    loadMyCareCircle,
+  createCareCircle,
+  loadMyCareCircle,
 } from '../../lib/careCircle';
-import { syncLocalActivitiesToCloud } from '../../lib/cloudActivities';
 import {
-    createCloudBaby,
-    loadCloudBabyForCircle,
+  downloadCloudActivities,
+  syncLocalActivitiesToCloud
+} from '../../lib/cloudActivities';
+import {
+  createCloudBaby,
+  loadCloudBabyForCircle,
 } from '../../lib/cloudBaby';
 import {
-    deleteAllSproutData,
-    exportSproutData,
+  deleteAllSproutData,
+  exportSproutData,
 } from '../../lib/dataControls';
 
 export default function SettingsScreen() {
@@ -47,6 +50,11 @@ export default function SettingsScreen() {
 
   const [syncingActivities, setSyncingActivities] =
     useState(false);
+
+  const [
+    downloadingActivities,
+    setDownloadingActivities,
+    ] = useState(false);
 
   const handleExport = async () => {
     if (exporting) {
@@ -283,6 +291,56 @@ const handleSyncActivities = async () => {
   }
 };
 
+const handleDownloadActivities = async () => {
+  if (!cloudBabyId || downloadingActivities) {
+    return;
+  }
+
+  setDownloadingActivities(true);
+
+  try {
+    const profile = await loadBabyProfile();
+
+    if (!profile) {
+      Alert.alert(
+        'Baby profile not found',
+        'A local baby profile is required before shared activity data can be downloaded.',
+      );
+      return;
+    }
+
+    const count =
+      await downloadCloudActivities(
+        cloudBabyId,
+        profile.id,
+      );
+
+    Alert.alert(
+      'Shared activities downloaded',
+      count === 0
+        ? 'There were no shared activities to download.'
+        : `${count} ${
+            count === 1
+              ? 'activity'
+              : 'activities'
+          } downloaded from your care circle.`,
+    );
+  } catch (error) {
+    console.error(
+      'Unable to download activities:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to download activities',
+      error instanceof Error
+        ? error.message
+        : 'Please try again.',
+    );
+  } finally {
+    setDownloadingActivities(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -407,6 +465,27 @@ const handleSyncActivities = async () => {
                 Sync activity data
             </Text>
             )}
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={downloadingActivities}
+          onPress={handleDownloadActivities}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.secondActionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          {downloadingActivities ? (
+            <ActivityIndicator
+              color="#48684D"
+              size="small"
+            />
+          ) : (
+            <Text style={styles.actionText}>
+              Download shared activity data
+            </Text>
+          )}
         </Pressable>
       </View>
     )}

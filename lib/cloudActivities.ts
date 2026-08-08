@@ -1,6 +1,9 @@
 import {
     BabyActivity,
+    DiaperType,
+    FeedingMethod,
     loadActivities,
+    mergeActivities,
 } from './activities';
 import { getCurrentSession } from './auth';
 import { supabase } from './supabase';
@@ -94,4 +97,181 @@ export async function syncLocalActivitiesToCloud(
   }
 
   return rows.length;
+}
+
+type CloudActivityRow = {
+  client_id: string | null;
+
+  type:
+    | 'feeding'
+    | 'diaper'
+    | 'sleep'
+    | 'note';
+
+  occurred_at: string;
+  created_at: string;
+  note: string | null;
+
+  feeding_method: string | null;
+  amount_oz: number | null;
+
+  diaper_type: string | null;
+
+  started_at: string | null;
+  ended_at: string | null;
+  duration_minutes: number | null;
+};
+
+function isFeedingMethod(
+  value: string | null,
+): value is FeedingMethod {
+  return (
+    value === 'Breast' ||
+    value === 'Bottle' ||
+    value === 'Solids'
+  );
+}
+
+function isDiaperType(
+  value: string | null,
+): value is DiaperType {
+  return (
+    value === 'Wet' ||
+    value === 'Dirty' ||
+    value === 'Both' ||
+    value === 'Dry'
+  );
+}
+
+function cloudRowToActivity(
+  row: CloudActivityRow,
+  localBabyProfileId: string,
+): BabyActivity {
+  if (!row.client_id) {
+    throw new Error(
+      'A shared activity is missing its client ID.',
+    );
+  }
+
+  const base = {
+    id: row.client_id,
+    babyProfileId:
+      localBabyProfileId,
+    occurredAt: row.occurred_at,
+    createdAt: row.created_at,
+  };
+
+  switch (row.type) {
+    case 'feeding':
+      if (
+        !isFeedingMethod(
+          row.feeding_method,
+        )
+      ) {
+        throw new Error(
+          'A shared feeding has an invalid feeding method.',
+        );
+      }
+
+      return {
+        ...base,
+        type: 'feeding',
+        feedingMethod:
+          row.feeding_method,
+        amountOz: row.amount_oz,
+        note: row.note,
+      };
+
+    case 'diaper':
+      if (
+        !isDiaperType(
+          row.diaper_type,
+        )
+      ) {
+        throw new Error(
+          'A shared diaper has an invalid diaper type.',
+        );
+      }
+
+      return {
+        ...base,
+        type: 'diaper',
+        diaperType:
+          row.diaper_type,
+        note: row.note,
+      };
+
+    case 'sleep':
+      if (
+        !row.started_at ||
+        !row.ended_at ||
+        row.duration_minutes === null
+      ) {
+        throw new Error(
+          'A shared sleep entry is incomplete.',
+        );
+      }
+
+      return {
+        ...base,
+        type: 'sleep',
+        startedAt: row.started_at,
+        endedAt: row.ended_at,
+        durationMinutes:
+          row.duration_minutes,
+        note: row.note,
+      };
+
+    case 'note':
+      return {
+        ...base,
+        type: 'note',
+        note: row.note ?? '',
+      };
+  }
+}
+
+export async function downloadCloudActivities(
+  babyId: string,
+  localBabyProfileId: string,
+): Promise<number> {
+  const { data, error } =
+    await supabase
+      .from('activities')
+      .select(`
+        client_id,
+        type,
+        occurred_at,
+        created_at,
+        note,
+        feeding_method,
+        amount_oz,
+        diaper_type,
+        started_at,
+        ended_at,
+        duration_minutes
+      `)
+      .eq('baby_id', babyId)
+      .order('occurred_at', {
+        ascending: false,
+      });
+
+  if (error) {
+    throw error;
+  }
+
+  const cloudActivities =
+    (data ?? []) as CloudActivityRow[];
+
+  const activities =
+    cloudActivities.map((row) =>
+      cloudRowToActivity(
+        row,
+        localBabyProfileId,
+      ),
+    );
+
+  await mergeActivities(activities);
+
+  return activities.length;
 }
