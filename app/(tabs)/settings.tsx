@@ -31,6 +31,7 @@ import {
 } from '../../lib/cloudActivities';
 import {
   createCloudBaby,
+  hydrateLocalBabyFromCloud,
   loadCloudBabyForCircle,
 } from '../../lib/cloudBaby';
 import {
@@ -309,19 +310,25 @@ const handleSyncActivities = async () => {
 };
 
 const handleDownloadActivities = async () => {
-  if (!cloudBabyId || downloadingActivities) {
+  if (!cloudBabyId || !careCircleId || downloadingActivities) {
     return;
   }
 
   setDownloadingActivities(true);
 
   try {
-    const profile = await loadBabyProfile();
+    let profile = await loadBabyProfile();
+
+    if (!profile) {
+      profile = await hydrateLocalBabyFromCloud(
+        careCircleId,
+      );
+    }
 
     if (!profile) {
       Alert.alert(
         'Baby profile not found',
-        'A local baby profile is required before shared activity data can be downloaded.',
+        'Sprout could not load the shared baby profile.',
       );
       return;
     }
@@ -333,23 +340,23 @@ const handleDownloadActivities = async () => {
       );
 
     Alert.alert(
-      'Shared activities downloaded',
+      'Shared data downloaded',
       count === 0
-        ? 'There were no shared activities to download.'
-        : `${count} ${
+        ? 'The shared baby profile is connected. There were no activities to download.'
+        : `The shared baby profile and ${count} ${
             count === 1
               ? 'activity'
               : 'activities'
-          } downloaded from your care circle.`,
+          } are now available on this device.`,
     );
   } catch (error) {
     console.error(
-      'Unable to download activities:',
+      'Unable to download shared data:',
       error,
     );
 
     Alert.alert(
-      'Unable to download activities',
+      'Unable to download shared data',
       error instanceof Error
         ? error.message
         : 'Please try again.',
@@ -617,7 +624,7 @@ const handleSignOut = async () => {
             />
           ) : (
             <Text style={styles.actionText}>
-              Download shared activity data
+              Download shared data
             </Text>
           )}
         </Pressable>

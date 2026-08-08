@@ -101,6 +101,35 @@ export async function loadBabyProfile():
   return profile;
 }
 
+export async function saveCloudBabyProfile(
+  cloudBaby: {
+    id: string;
+    name: string;
+    birthDate: string;
+  },
+): Promise<BabyProfile> {
+  const existingProfile =
+    await loadStoredProfile();
+
+  const profile: BabyProfile = {
+    id:
+      existingProfile?.id ??
+      cloudBaby.id,
+    name: cloudBaby.name,
+    birthDate: cloudBaby.birthDate,
+    photoUri:
+      existingProfile?.photoUri ??
+      null,
+    createdAt:
+      existingProfile?.createdAt ??
+      new Date().toISOString(),
+  };
+
+  await saveBabyProfile(profile);
+
+  return profile;
+}
+
 async function loadStoredProfile():
   Promise<BabyProfile | null> {
   const storedProfile =

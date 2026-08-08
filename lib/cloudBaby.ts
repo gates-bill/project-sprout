@@ -1,4 +1,7 @@
-import { BabyProfile } from './babyProfile';
+import {
+  BabyProfile,
+  saveCloudBabyProfile,
+} from './babyProfile';
 import { supabase } from './supabase';
 
 export type CloudBaby = {
@@ -56,4 +59,23 @@ export async function loadCloudBabyForCircle(
     name: data.name,
     birthDate: data.birth_date,
   };
+}
+
+export async function hydrateLocalBabyFromCloud(
+  careCircleId: string,
+): Promise<BabyProfile | null> {
+  const cloudBaby =
+    await loadCloudBabyForCircle(
+      careCircleId,
+    );
+
+  if (!cloudBaby) {
+    return null;
+  }
+
+  return saveCloudBabyProfile({
+    id: cloudBaby.id,
+    name: cloudBaby.name,
+    birthDate: cloudBaby.birthDate,
+  });
 }
