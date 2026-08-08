@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -11,6 +11,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getCurrentSession } from '../../lib/auth';
+import { loadBabyProfile } from '../../lib/babyProfile';
+import {
+    createCareCircle,
+    loadMyCareCircle,
+} from '../../lib/careCircle';
+import { syncLocalActivitiesToCloud } from '../../lib/cloudActivities';
+import {
+    createCloudBaby,
+    loadCloudBabyForCircle,
+} from '../../lib/cloudBaby';
 import {
     deleteAllSproutData,
     exportSproutData,
@@ -19,10 +30,22 @@ import {
 export default function SettingsScreen() {
   const router = useRouter();
 
+  const [careCircleId, setCareCircleId] =
+    useState<string | null>(null);
+
+  const [creatingBaby, setCreatingBaby] =
+    useState(false);
+
+  const [cloudBabyId, setCloudBabyId] =
+    useState<string | null>(null);
+
   const [exporting, setExporting] =
     useState(false);
 
   const [deleting, setDeleting] =
+    useState(false);
+
+  const [syncingActivities, setSyncingActivities] =
     useState(false);
 
   const handleExport = async () => {
@@ -93,6 +116,174 @@ export default function SettingsScreen() {
     }
   };
 
+  const [signedInEmail, setSignedInEmail] =
+    useState<string | null>(null);
+
+  const [creatingCircle, setCreatingCircle] =
+    useState(false);
+
+useEffect(() => {
+  const loadSharedSetup = async () => {
+    try {
+      const { data } =
+        await getCurrentSession();
+
+      const email =
+        data.session?.user.email ?? null;
+
+      setSignedInEmail(email);
+
+      if (!email) {
+        return;
+      }
+
+      const circle =
+        await loadMyCareCircle();
+
+      if (!circle) {
+        return;
+      }
+
+      setCareCircleId(circle.id);
+
+      const cloudBaby =
+        await loadCloudBabyForCircle(
+          circle.id,
+        );
+
+      setCloudBabyId(
+        cloudBaby?.id ?? null,
+      );
+    } catch (error) {
+      console.error(
+        'Unable to load shared setup:',
+        error,
+      );
+    }
+  };
+
+  loadSharedSetup();
+}, []);
+
+    const handleCreateCareCircle = async () => {
+    if (creatingCircle) {
+        return;
+    }
+
+    setCreatingCircle(true);
+
+    try {
+        const careCircleId =
+        await createCareCircle('Our Family');
+
+        setCareCircleId(careCircleId);
+
+        Alert.alert(
+        'Care circle created',
+        `Your shared care circle is ready.\n\nID: ${careCircleId}`,
+        );
+    } catch (error) {
+        console.error(
+        'Unable to create care circle:',
+        error,
+        );
+
+        Alert.alert(
+        'Unable to create care circle',
+        error instanceof Error
+            ? error.message
+            : 'Please try again.',
+        );
+    } finally {
+        setCreatingCircle(false);
+    }
+    };
+
+const handleCreateCloudBaby = async () => {
+  if (!careCircleId || creatingBaby) {
+    return;
+  }
+
+  setCreatingBaby(true);
+
+  try {
+    const profile = await loadBabyProfile();
+
+    if (!profile) {
+      Alert.alert(
+        'Baby profile not found',
+        'Create a baby profile first.',
+      );
+      return;
+    }
+
+    const babyId = await createCloudBaby(
+      careCircleId,
+      profile,
+    );
+
+    Alert.alert(
+      'Baby connected',
+      `The baby profile is now stored in the shared care circle.\n\nID: ${babyId}`,
+    );
+  } catch (error) {
+    console.error(
+      'Unable to create cloud baby:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to connect baby',
+      error instanceof Error
+        ? error.message
+        : 'Please try again.',
+    );
+  } finally {
+    setCreatingBaby(false);
+  }
+};
+
+const handleSyncActivities = async () => {
+  if (!cloudBabyId || syncingActivities) {
+    return;
+  }
+
+  setSyncingActivities(true);
+
+  try {
+    const count =
+      await syncLocalActivitiesToCloud(
+        cloudBabyId,
+      );
+
+    Alert.alert(
+      'Activities synced',
+      count === 0
+        ? 'There were no activities to sync.'
+        : `${count} ${
+            count === 1
+              ? 'activity'
+              : 'activities'
+          } synced to your care circle.`,
+    );
+  } catch (error) {
+    console.error(
+      'Unable to sync activities:',
+      error,
+    );
+
+    Alert.alert(
+      'Unable to sync activities',
+      error instanceof Error
+        ? error.message
+        : 'Please try again.',
+    );
+  } finally {
+    setSyncingActivities(false);
+  }
+};
+
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -111,6 +302,130 @@ export default function SettingsScreen() {
           Your baby’s information belongs to your
           family.
         </Text>
+
+        <Text style={styles.sectionTitle}>
+        Care circle
+        </Text>
+
+        <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+            Shared caregiving
+        </Text>
+
+        <Text style={styles.cardText}>
+            {signedInEmail
+            ? `Signed in as ${signedInEmail}`
+            : 'Sign in to share baby care data with another caregiver.'}
+        </Text>
+
+{signedInEmail ? (
+  <>
+    {careCircleId ? (
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>
+          Care circle connected
+        </Text>
+
+        <Text style={styles.statusText}>
+          Your account is connected to a shared care circle.
+        </Text>
+      </View>
+    ) : (
+      <Pressable
+        accessibilityRole="button"
+        disabled={creatingCircle}
+        onPress={handleCreateCareCircle}
+        style={({ pressed }) => [
+          styles.actionButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        {creatingCircle ? (
+          <ActivityIndicator
+            color="#48684D"
+            size="small"
+          />
+        ) : (
+          <Text style={styles.actionText}>
+            Create care circle
+          </Text>
+        )}
+      </Pressable>
+    )}
+
+    {careCircleId &&
+      !cloudBabyId && (
+        <Pressable
+          accessibilityRole="button"
+          disabled={creatingBaby}
+          onPress={handleCreateCloudBaby}
+          style={({ pressed }) => [
+            styles.actionButton,
+            styles.secondActionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          {creatingBaby ? (
+            <ActivityIndicator
+              color="#48684D"
+              size="small"
+            />
+          ) : (
+            <Text style={styles.actionText}>
+              Connect baby profile
+            </Text>
+          )}
+        </Pressable>
+      )}
+
+    {cloudBabyId && (
+      <View style={styles.babyStatus}>
+        <Text style={styles.statusTitle}>
+          Baby profile connected
+        </Text>
+
+        <Text style={styles.statusText}>
+          This baby is ready for shared activity syncing.
+        </Text>
+        <Pressable
+            accessibilityRole="button"
+            disabled={syncingActivities}
+            onPress={handleSyncActivities}
+            style={({ pressed }) => [
+            styles.actionButton,
+            styles.secondActionButton,
+            pressed && styles.pressed,
+            ]}
+        >
+            {syncingActivities ? (
+            <ActivityIndicator
+                color="#48684D"
+                size="small"
+            />
+            ) : (
+            <Text style={styles.actionText}>
+                Sync activity data
+            </Text>
+            )}
+        </Pressable>
+      </View>
+    )}
+  </>
+) : (
+  <Pressable
+    accessibilityRole="button"
+    onPress={() => router.push('/auth')}
+    style={({ pressed }) => [
+      styles.actionButton,
+      pressed && styles.pressed,
+    ]}
+  >
+    <Text style={styles.actionText}>
+      Sign in
+    </Text>
+  </Pressable>
+)}
+        </View>
 
         <Text style={styles.sectionTitle}>
           Your data
@@ -151,15 +466,13 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.privacyCard}>
-          <Text style={styles.privacyTitle}>
-            Stored locally
-          </Text>
+            <Text style={styles.privacyTitle}>
+                Private by default
+            </Text>
 
-          <Text style={styles.privacyText}>
-            Sprout currently keeps your profile and
-            tracking data on this device. No Sprout
-            account or cloud service is required.
-          </Text>
+            <Text style={styles.privacyText}>
+                Your family’s data is shared only with caregivers you choose to invite.
+            </Text>
         </View>
 
         <Text style={styles.dangerSectionTitle}>
@@ -336,4 +649,33 @@ const styles = StyleSheet.create({
     opacity: 0.78,
     transform: [{ scale: 0.99 }],
   },
+  secondActionButton: {
+    marginTop: 10,
+  },
+  statusCard: {
+  borderColor: '#C9D6C5',
+  borderRadius: 14,
+  borderWidth: 1,
+  backgroundColor: '#EBF0E7',
+  padding: 15,
+},
+babyStatus: {
+  borderColor: '#C9D6C5',
+  borderRadius: 14,
+  borderWidth: 1,
+  backgroundColor: '#F2F5EF',
+  marginTop: 10,
+  padding: 15,
+},
+statusTitle: {
+  color: '#304435',
+  fontSize: 15,
+  fontWeight: '700',
+},
+statusText: {
+  color: '#657569',
+  fontSize: 13,
+  lineHeight: 19,
+  marginTop: 5,
+},
 });

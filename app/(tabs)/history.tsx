@@ -128,17 +128,29 @@ export default function HistoryScreen() {
         </Text>
 
         {groups.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🌱</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>☘</Text>
 
             <Text style={styles.emptyTitle}>
-              No history yet
+              Nothing here yet
             </Text>
 
             <Text style={styles.emptyText}>
-              Feedings, diapers, sleep sessions, and
-              notes will appear here.
+              Feedings, diapers, sleep, and notes will appear here as you log them.
             </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/home')}
+              style={({ pressed }) => [
+                styles.emptyButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.emptyButtonText}>
+                Go to Today
+              </Text>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.groups}>
@@ -548,4 +560,28 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginLeft: 8,
   },
+  emptyState: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 30,
+  paddingTop: 90,
+},
+emptyButton: {
+  minHeight: 50,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 16,
+  backgroundColor: '#48684D',
+  marginTop: 24,
+  paddingHorizontal: 22,
+},
+emptyButtonText: {
+  color: '#FFFFFF',
+  fontSize: 15,
+  fontWeight: '700',
+},
+pressed: {
+  opacity: 0.82,
+  transform: [{ scale: 0.99 }],
+},
 });

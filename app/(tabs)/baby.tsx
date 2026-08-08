@@ -94,18 +94,28 @@ export default function BabyScreen() {
           </Text>
 
           {profile?.birthDate && (
-            <Text style={styles.birthDate}>
-              Born{' '}
-              {new Date(
-                profile.birthDate,
-              ).toLocaleDateString(undefined, {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
-          )}
+            <>
+                <Text style={styles.age}>
+                {formatBabyAge(profile.birthDate)}
+                </Text>
+
+                <Text style={styles.birthDate}>
+                Born{' '}
+                {new Date(
+                    profile.birthDate,
+                ).toLocaleDateString(undefined, {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                })}
+                </Text>
+            </>
+            )}
         </View>
+
+        <Text style={styles.helperText}>
+        Profile details stay on this device unless you choose to export your data.
+        </Text>
 
         <Pressable
             accessibilityRole="button"
@@ -122,6 +132,56 @@ export default function BabyScreen() {
       </View>
     </SafeAreaView>
   );
+}
+
+function formatBabyAge(birthDate: string): string {
+  const birth = new Date(birthDate);
+  const today = new Date();
+
+  let months =
+    (today.getFullYear() - birth.getFullYear()) * 12 +
+    today.getMonth() -
+    birth.getMonth();
+
+  if (today.getDate() < birth.getDate()) {
+    months -= 1;
+  }
+
+  if (months < 1) {
+    const millisecondsPerDay =
+      1000 * 60 * 60 * 24;
+
+    const days = Math.max(
+      0,
+      Math.floor(
+        (today.getTime() - birth.getTime()) /
+          millisecondsPerDay,
+      ),
+    );
+
+    return `${days} ${days === 1 ? 'day' : 'days'} old`;
+  }
+
+  if (months < 24) {
+    return `${months} ${
+      months === 1 ? 'month' : 'months'
+    } old`;
+  }
+
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+
+  if (remainingMonths === 0) {
+    return `${years} ${
+      years === 1 ? 'year' : 'years'
+    } old`;
+  }
+
+  return `${years} ${
+    years === 1 ? 'year' : 'years'
+  }, ${remainingMonths} ${
+    remainingMonths === 1 ? 'month' : 'months'
+  } old`;
 }
 
 const styles = StyleSheet.create({
@@ -206,5 +266,19 @@ editButtonText: {
   color: '#FFFFFF',
   fontSize: 16,
   fontWeight: '700',
+},
+age: {
+  color: '#48684D',
+  fontSize: 16,
+  fontWeight: '700',
+  marginTop: 8,
+},
+helperText: {
+  color: '#7A847C',
+  fontSize: 13,
+  lineHeight: 19,
+  textAlign: 'center',
+  marginTop: 14,
+  paddingHorizontal: 18,
 },
 });
