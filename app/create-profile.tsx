@@ -20,6 +20,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { saveBabyProfile } from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import {
+  createCloudBaby,
+  loadCloudBabyForCircle,
+} from '../lib/cloudBaby';
 
 export default function CreateProfileScreen() {
   const router = useRouter();
@@ -99,13 +104,36 @@ export default function CreateProfileScreen() {
     setSaving(true);
 
     try {
-      await saveBabyProfile({
+      const profile = {
         id: Date.now().toString(),
         name: name.trim(),
         birthDate: birthDate.toISOString(),
         photoUri,
         createdAt: new Date().toISOString(),
-      });
+      };
+
+      await saveBabyProfile(profile);
+
+      try {
+        const circle = await loadMyCareCircle();
+
+        if (circle) {
+          const existingCloudBaby =
+            await loadCloudBabyForCircle(circle.id);
+
+          if (!existingCloudBaby) {
+            await createCloudBaby(
+              circle.id,
+              profile,
+            );
+          }
+        }
+      } catch (syncError) {
+        console.warn(
+          'Unable to connect the new baby profile yet:',
+          syncError,
+        );
+      }
 
       router.replace('/home');
     } catch {

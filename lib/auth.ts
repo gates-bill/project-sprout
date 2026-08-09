@@ -24,6 +24,12 @@ export async function signOut() {
   return supabase.auth.signOut();
 }
 
+export async function clearLocalAuthSession() {
+  return supabase.auth.signOut({
+    scope: 'local',
+  });
+}
+
 export async function getCurrentSession() {
   return supabase.auth.getSession();
 }

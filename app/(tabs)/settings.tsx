@@ -14,7 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import * as Clipboard from 'expo-clipboard';
+import { deleteAccount } from '../../lib/accountDeletion';
 import {
+  clearLocalAuthSession,
   getCurrentSession,
   signOut
 } from '../../lib/auth';
@@ -58,6 +60,9 @@ export default function SettingsScreen() {
     useState(false);
 
   const [deleting, setDeleting] =
+    useState(false);
+
+  const [deletingAccount, setDeletingAccount] =
     useState(false);
 
   const [creatingInvite, setCreatingInvite] =
@@ -146,6 +151,90 @@ export default function SettingsScreen() {
       );
 
       setDeleting(false);
+    }
+  };
+
+  const confirmAccountDeletion = () => {
+    if (deletingAccount) {
+      return;
+    }
+
+    Alert.alert(
+      'Delete your account?',
+      'Account deletion is permanent. Your sign-in will be removed. If you are the only member of a Care Circle, its shared baby profile, photo, activities, and sleep data will also be deleted.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: confirmAccountDeletionAgain,
+        },
+      ],
+    );
+  };
+
+  const confirmAccountDeletionAgain = () => {
+    Alert.alert(
+      'Permanently delete account',
+      'This cannot be undone. If you own a Care Circle with other caregivers, deletion will be blocked so their shared data is protected.',
+      [
+        {
+          text: 'Keep account',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete my account',
+          style: 'destructive',
+          onPress: handleDeleteAccount,
+        },
+      ],
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deletingAccount) {
+      return;
+    }
+
+    setDeletingAccount(true);
+    let serverDeletionSucceeded = false;
+
+    try {
+      await deleteAccount();
+      serverDeletionSucceeded = true;
+      await deleteAllSproutData();
+      await clearLocalAuthSession();
+
+      router.replace('/');
+    } catch (error) {
+      console.error(
+        'Unable to delete account:',
+        error,
+      );
+
+      if (serverDeletionSucceeded) {
+        await clearLocalAuthSession();
+        router.replace('/');
+
+        Alert.alert(
+          'Account deleted',
+          'Your account was deleted, but Sprout could not finish clearing this device. Reopen the app and use Delete all Sprout data before signing in again.',
+        );
+
+        return;
+      }
+
+      Alert.alert(
+        'Unable to delete account',
+        error instanceof Error
+          ? error.message
+          : 'Nothing was deleted. Please try again.',
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -256,10 +345,7 @@ const handleCreateCloudBaby = async () => {
     const profile = await loadBabyProfile();
 
     if (!profile) {
-      Alert.alert(
-        'Baby profile not found',
-        'Create a baby profile first.',
-      );
+      router.push('/create-profile');
       return;
     }
 
@@ -928,6 +1014,45 @@ const handleShareInvite = async () => {
             )}
           </Pressable>
         </View>
+
+        {signedInEmail && (
+          <View
+            style={[
+              styles.dangerCard,
+              styles.accountDeleteCard,
+            ]}
+          >
+            <Text style={styles.dangerTitle}>
+              Delete account
+            </Text>
+
+            <Text style={styles.dangerText}>
+              Permanently remove your Sprout sign-in and
+              Care Circle membership. Owners must first
+              remove other caregivers.
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={deletingAccount}
+              onPress={confirmAccountDeletion}
+              style={({ pressed }) => [
+                styles.deleteAccountButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              {deletingAccount ? (
+                <ActivityIndicator color="#FFF9F8" />
+              ) : (
+                <Text
+                  style={styles.deleteAccountButtonText}
+                >
+                  Delete account
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1048,6 +1173,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF9F8',
     padding: 19,
   },
+  accountDeleteCard: {
+    marginTop: 14,
+  },
   dangerTitle: {
     color: '#7E403B',
     fontSize: 16,
@@ -1070,6 +1198,19 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#9A403B',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deleteAccountButton: {
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: '#9A403B',
+    marginTop: 18,
+  },
+  deleteAccountButtonText: {
+    color: '#FFF9F8',
     fontSize: 15,
     fontWeight: '700',
   },
