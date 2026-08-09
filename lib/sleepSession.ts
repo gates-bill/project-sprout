@@ -5,8 +5,10 @@ const ACTIVE_SLEEP_STORAGE_KEY =
 
 export type ActiveSleepSession = {
   babyProfileId: string;
+  cloudBabyId?: string;
   startedAt: string;
   createdAt: string;
+  syncStatus?: 'pending' | 'synced';
 };
 
 export async function loadActiveSleepSession():

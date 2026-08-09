@@ -35,6 +35,9 @@ import {
 } from '../../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 import {
+  loadCloudActiveSleep,
+} from '../../lib/cloudSleepSession';
+import {
   deleteAllSproutData,
 } from '../../lib/dataControls';
 import {
@@ -107,16 +110,21 @@ if (circle) {
       circle.id,
     );
 
-  if (cloudBaby) {
-    await syncPendingActivitiesToCloud(
-      cloudBaby.id,
-    );
+if (cloudBaby) {
+  await syncPendingActivitiesToCloud(
+    cloudBaby.id,
+  );
 
-    await downloadCloudActivities(
-      cloudBaby.id,
-      savedProfile.id,
-    );
-  }
+  await downloadCloudActivities(
+    cloudBaby.id,
+    savedProfile.id,
+  );
+
+  await loadCloudActiveSleep(
+    cloudBaby.id,
+    savedProfile.id,
+  );
+}
 } else {
   const { data: sessionData } =
     await getCurrentSession();
@@ -156,6 +164,9 @@ if (circle) {
     const savedActivities =
       await loadActivities();
 
+    const refreshedActiveSleep =
+      await loadActiveSleepSession();
+
     const today = new Date();
 
     const todaysActivities =
@@ -176,9 +187,9 @@ if (circle) {
       setActivities(todaysActivities);
 
       setActiveSleep(
-        savedActiveSleep?.babyProfileId ===
+        refreshedActiveSleep?.babyProfileId ===
           savedProfile.id
-          ? savedActiveSleep
+          ? refreshedActiveSleep
           : null,
       );
     }

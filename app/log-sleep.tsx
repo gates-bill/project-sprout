@@ -25,6 +25,10 @@ import {
 } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 import {
+  deleteCloudActiveSleep,
+  syncActiveSleepToCloud,
+} from '../lib/cloudSleepSession';
+import {
   ActiveSleepSession,
   clearActiveSleepSession,
   loadActiveSleepSession,
@@ -48,10 +52,11 @@ export default function LogSleepScreen() {
 
     const loadScreen = async () => {
       try {
-        const [profile, savedSleep] = await Promise.all([
-          loadBabyProfile(),
-          loadActiveSleepSession(),
-        ]);
+        const [profile, savedSleep] =
+          await Promise.all([
+            loadBabyProfile(),
+            loadActiveSleepSession(),
+          ]);
 
         if (!profile) {
           router.replace('/');
@@ -73,7 +78,10 @@ export default function LogSleepScreen() {
           await clearActiveSleepSession();
         }
       } catch (error) {
-        console.error('Unable to load sleep screen:', error);
+        console.error(
+          'Unable to load sleep screen:',
+          error,
+        );
 
         Alert.alert(
           'Unable to load sleep',
@@ -86,7 +94,7 @@ export default function LogSleepScreen() {
       }
     };
 
-    loadScreen();
+    void loadScreen();
 
     return () => {
       isActive = false;
@@ -120,7 +128,9 @@ export default function LogSleepScreen() {
 
     const minutes = Math.max(
       0,
-      Math.floor((nowMs - startedMs) / 60000),
+      Math.floor(
+        (nowMs - startedMs) / 60000,
+      ),
     );
 
     return formatDuration(minutes);
@@ -134,17 +144,78 @@ export default function LogSleepScreen() {
     setSaving(true);
 
     try {
-      const now = new Date().toISOString();
+      const now =
+        new Date().toISOString();
 
-      await saveActiveSleepSession({
+      const sleepSession: ActiveSleepSession = {
         babyProfileId,
         startedAt: now,
         createdAt: now,
-      });
+        syncStatus: 'pending',
+      };
+
+      await saveActiveSleepSession(
+        sleepSession,
+      );
+
+      try {
+        const circle =
+          await loadMyCareCircle();
+
+        if (!circle) {
+          Alert.alert(
+            'Debug',
+            'No Care Circle was found.',
+          );
+
+          router.back();
+          return;
+        }
+
+        const cloudBaby =
+          await loadCloudBabyForCircle(
+            circle.id,
+          );
+
+        if (!cloudBaby) {
+          Alert.alert(
+            'Debug',
+            'Care Circle found, but no cloud baby was found.',
+          );
+
+          router.back();
+          return;
+        }
+
+        Alert.alert(
+          'Debug',
+          `Cloud baby found: ${cloudBaby.id}`,
+        );
+
+        await syncActiveSleepToCloud(
+          sleepSession,
+          cloudBaby.id,
+        );
+      } catch (syncError) {
+        console.warn(
+          'Sleep started locally but could not sync:',
+          syncError,
+        );
+
+        Alert.alert(
+          'Active sleep sync failed',
+          syncError instanceof Error
+            ? syncError.message
+            : JSON.stringify(syncError),
+        );
+      }
 
       router.back();
     } catch (error) {
-      console.error('Unable to start sleep:', error);
+      console.error(
+        'Unable to start sleep:',
+        error,
+      );
 
       Alert.alert(
         'Unable to start sleep',
@@ -164,65 +235,82 @@ export default function LogSleepScreen() {
 
     try {
       const endedAt = new Date();
-      const startedAt = new Date(activeSleep.startedAt);
+      const startedAt = new Date(
+        activeSleep.startedAt,
+      );
 
       const durationMinutes = Math.max(
         1,
         Math.round(
-          (endedAt.getTime() - startedAt.getTime()) /
-            60000,
+          (
+            endedAt.getTime() -
+            startedAt.getTime()
+          ) / 60000,
         ),
       );
 
-      const endedAtIso = endedAt.toISOString();
+      const endedAtIso =
+        endedAt.toISOString();
 
-const sleepActivity: BabyActivity = {
-  id: Date.now().toString(),
-  babyProfileId: activeSleep.babyProfileId,
-  type: 'sleep',
-  startedAt: activeSleep.startedAt,
-  endedAt: endedAtIso,
-  durationMinutes,
-  note: note.trim() || null,
-  occurredAt: endedAtIso,
-  createdAt: endedAtIso,
-};
+      const sleepActivity: BabyActivity = {
+        id: Date.now().toString(),
+        babyProfileId:
+          activeSleep.babyProfileId,
+        type: 'sleep',
+        startedAt:
+          activeSleep.startedAt,
+        endedAt: endedAtIso,
+        durationMinutes,
+        note: note.trim() || null,
+        occurredAt: endedAtIso,
+        createdAt: endedAtIso,
+      };
 
-await addActivity(sleepActivity);
-
-try {
-  const circle = await loadMyCareCircle();
-
-  if (circle) {
-    const cloudBaby =
-      await loadCloudBabyForCircle(
-        circle.id,
-      );
-
-    if (cloudBaby) {
-      await syncActivityToCloud(
+      await addActivity(
         sleepActivity,
-        cloudBaby.id,
       );
-    }
-  }
-} catch (syncError) {
-  console.warn(
-    'Sleep saved locally but could not sync:',
-    syncError,
-  );
 
-  Alert.alert(
-    'Saved on this device',
-    'The sleep entry was saved, but Sprout could not sync it with your Care Circle yet.',
-  );
-}
+      try {
+        const circle =
+          await loadMyCareCircle();
 
-await clearActiveSleepSession();
+        if (circle) {
+          const cloudBaby =
+            await loadCloudBabyForCircle(
+              circle.id,
+            );
 
-router.back();
+          if (cloudBaby) {
+            await syncActivityToCloud(
+              sleepActivity,
+              cloudBaby.id,
+            );
+
+            await deleteCloudActiveSleep(
+              cloudBaby.id,
+            );
+          }
+        }
+      } catch (syncError) {
+        console.warn(
+          'Sleep saved locally but could not sync:',
+          syncError,
+        );
+
+        Alert.alert(
+          'Saved on this device',
+          'The sleep entry was saved, but Sprout could not sync it with your Care Circle yet.',
+        );
+      }
+
+      await clearActiveSleepSession();
+
+      router.back();
     } catch (error) {
-      console.error('Unable to end sleep:', error);
+      console.error(
+        'Unable to end sleep:',
+        error,
+      );
 
       Alert.alert(
         'Unable to end sleep',
@@ -235,8 +323,13 @@ router.back();
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingScreen}>
-        <ActivityIndicator color="#48684D" size="large" />
+      <SafeAreaView
+        style={styles.loadingScreen}
+      >
+        <ActivityIndicator
+          color="#48684D"
+          size="large"
+        />
       </SafeAreaView>
     );
   }
@@ -244,23 +337,39 @@ router.back();
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : undefined
+        }
         style={styles.keyboardView}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={
+            styles.content
+          }
           keyboardShouldPersistTaps="handled"
         >
           <Pressable
             accessibilityLabel="Go back"
             accessibilityRole="button"
-            onPress={() => router.back()}
+            onPress={() =>
+              router.back()
+            }
             style={styles.backButton}
           >
-            <Text style={styles.backButtonText}>‹</Text>
+            <Text
+              style={
+                styles.backButtonText
+              }
+            >
+              ‹
+            </Text>
           </Pressable>
 
-          <Text style={styles.eyebrow}>QUICK ADD</Text>
+          <Text style={styles.eyebrow}>
+            QUICK ADD
+          </Text>
 
           <Text style={styles.title}>
             {activeSleep
@@ -268,49 +377,85 @@ router.back();
               : 'Start a sleep'}
           </Text>
 
-          <Text style={styles.description}>
+          <Text
+            style={styles.description}
+          >
             {activeSleep
               ? 'End the session whenever your baby wakes up.'
               : 'Start the timer when your baby falls asleep.'}
           </Text>
 
           <View style={styles.sleepCard}>
-            <Text style={styles.sleepIcon}>☾</Text>
+            <Text
+              style={styles.sleepIcon}
+            >
+              ☾
+            </Text>
 
             {activeSleep ? (
               <>
-                <Text style={styles.sleepStatus}>
+                <Text
+                  style={
+                    styles.sleepStatus
+                  }
+                >
                   Sleeping
                 </Text>
 
-                <Text style={styles.elapsedTime}>
+                <Text
+                  style={
+                    styles.elapsedTime
+                  }
+                >
                   {elapsedText}
                 </Text>
 
-                <Text style={styles.startedTime}>
+                <Text
+                  style={
+                    styles.startedTime
+                  }
+                >
                   Started at{' '}
-                  {formatTime(activeSleep.startedAt)}
+                  {formatTime(
+                    activeSleep.startedAt,
+                  )}
                 </Text>
               </>
             ) : (
               <>
-                <Text style={styles.sleepStatus}>
+                <Text
+                  style={
+                    styles.sleepStatus
+                  }
+                >
                   Ready when you are
                 </Text>
 
-                <Text style={styles.readyDescription}>
-                  The start time will be saved on this
-                  device.
+                <Text
+                  style={
+                    styles.readyDescription
+                  }
+                >
+                  The start time will be
+                  saved on this device.
                 </Text>
               </>
             )}
           </View>
 
           {activeSleep && (
-            <View style={styles.section}>
-              <Text style={styles.label}>
+            <View
+              style={styles.section}
+            >
+              <Text
+                style={styles.label}
+              >
                 Note
-                <Text style={styles.optional}>
+                <Text
+                  style={
+                    styles.optional
+                  }
+                >
                   {' '}· Optional
                 </Text>
               </Text>
@@ -321,7 +466,9 @@ router.back();
                 onChangeText={setNote}
                 placeholder="Anything you’d like to remember"
                 placeholderTextColor="#9AA29B"
-                style={styles.noteInput}
+                style={
+                  styles.noteInput
+                }
                 textAlignVertical="top"
                 value={note}
               />
@@ -333,19 +480,30 @@ router.back();
               accessibilityRole="button"
               disabled={saving}
               onPress={
-                activeSleep ? endSleep : startSleep
+                activeSleep
+                  ? endSleep
+                  : startSleep
               }
               style={({ pressed }) => [
                 styles.primaryButton,
-                activeSleep && styles.endButton,
-                saving && styles.primaryButtonDisabled,
-                pressed && styles.pressed,
+                activeSleep &&
+                  styles.endButton,
+                saving &&
+                  styles.primaryButtonDisabled,
+                pressed &&
+                  styles.pressed,
               ]}
             >
               {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator
+                  color="#FFFFFF"
+                />
               ) : (
-                <Text style={styles.primaryButtonText}>
+                <Text
+                  style={
+                    styles.primaryButtonText
+                  }
+                >
                   {activeSleep
                     ? 'End sleep'
                     : 'Start sleep'}
@@ -353,24 +511,37 @@ router.back();
               )}
             </Pressable>
 
-          {!activeSleep && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() =>
-                router.push('/log-sleep-manual')
-              }
-              style={({ pressed }) => [
-                styles.manualButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.manualButtonText}>
-                Add completed sleep
-              </Text>
-            </Pressable>
-          )}
+            {!activeSleep && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push(
+                    '/log-sleep-manual',
+                  )
+                }
+                style={({
+                  pressed,
+                }) => [
+                  styles.manualButton,
+                  pressed &&
+                    styles.pressed,
+                ]}
+              >
+                <Text
+                  style={
+                    styles.manualButtonText
+                  }
+                >
+                  Add completed sleep
+                </Text>
+              </Pressable>
+            )}
 
-            <Text style={styles.helperText}>
+            <Text
+              style={
+                styles.helperText
+              }
+            >
               {activeSleep
                 ? 'Ending creates a completed entry in Today.'
                 : 'You can safely close the app while the timer is active.'}
@@ -382,20 +553,28 @@ router.back();
   );
 }
 
-function formatTime(value: string): string {
-  return new Date(value).toLocaleTimeString(undefined, {
+function formatTime(
+  value: string,
+): string {
+  return new Date(
+    value,
+  ).toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   });
 }
 
-function formatDuration(minutes: number): string {
+function formatDuration(
+  minutes: number,
+): string {
   if (minutes < 1) {
     return 'Less than 1 min';
   }
 
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
+  const hours =
+    Math.floor(minutes / 60);
+  const remainingMinutes =
+    minutes % 60;
 
   if (hours === 0) {
     return `${minutes} min`;
@@ -558,22 +737,25 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.82,
-    transform: [{ scale: 0.99 }],
+    transform: [
+      {
+        scale: 0.99,
+      },
+    ],
   },
-
- manualButton: {
-  minHeight: 54,
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderColor: '#C9D6C5',
-  borderRadius: 18,
-  borderWidth: 1,
-  backgroundColor: '#FFFEFA',
-  marginTop: 12,
-},
-manualButtonText: {
-  color: '#48684D',
-  fontSize: 16,
-  fontWeight: '700',
-},
+  manualButton: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: '#C9D6C5',
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: '#FFFEFA',
+    marginTop: 12,
+  },
+  manualButtonText: {
+    color: '#48684D',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });
