@@ -38,6 +38,9 @@ import {
   deleteAllSproutData,
   exportSproutData,
 } from '../../lib/dataControls';
+import {
+  saveSharedCareCircleId,
+} from '../../lib/sharedCareState';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -175,6 +178,10 @@ useEffect(() => {
       }
 
       setCareCircleId(circle.id);
+
+      await saveSharedCareCircleId(
+        circle.id,
+      );
 
       setCareCircleRole(circle.role);
 
@@ -333,6 +340,10 @@ const handleJoinCircle = async () => {
       );
 
     setCareCircleId(joinedCircleId);
+
+    await saveSharedCareCircleId(
+      joinedCircleId,
+    );
 
     const cloudBaby =
       await loadCloudBabyForCircle(

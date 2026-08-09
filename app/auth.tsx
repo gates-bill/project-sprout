@@ -1,24 +1,29 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-    signInWithEmail,
-    signUpWithEmail,
+  signInWithEmail,
+  signUpWithEmail,
 } from '../lib/auth';
 
-import { createCareCircle } from '../lib/careCircle';
+import {
+  loadMyCareCircle,
+} from '../lib/careCircle';
+import {
+  hydrateLocalBabyFromCloud,
+} from '../lib/cloudBaby';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -26,6 +31,28 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [working, setWorking] = useState(false);
+
+const continueAfterSignIn = async () => {
+  const circle =
+    await loadMyCareCircle();
+
+  if (!circle) {
+    router.replace('/settings');
+    return;
+  }
+
+  const profile =
+    await hydrateLocalBabyFromCloud(
+      circle.id,
+    );
+
+  if (profile) {
+    router.replace('/home');
+    return;
+  }
+
+  router.replace('/settings');
+};
 
   const handleSignUp = async () => {
     if (!email.trim() || password.length < 8) {
@@ -62,74 +89,59 @@ export default function AuthScreen() {
         return;
       }
 
-      Alert.alert(
-        'Account created',
-        'You are signed in.',
-        [
-          {
-            text: 'Continue',
-            onPress: () =>
-              router.replace('/home'),
-          },
-        ],
-      );
+Alert.alert(
+  'Account created',
+  'You are signed in.',
+  [
+    {
+      text: 'Continue',
+      onPress: () => {
+        void continueAfterSignIn();
+      },
+    },
+  ],
+);
     } finally {
       setWorking(false);
     }
   };
 
-  const handleSignIn = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert(
-        'Missing information',
-        'Enter your email and password.',
-      );
+const handleSignIn = async () => {
+  if (!email.trim() || !password) {
+    Alert.alert(
+      'Missing information',
+      'Enter your email and password.',
+    );
 
-      return;
-    }
+    return;
+  }
 
-    setWorking(true);
-
-    try {
-      const { error } =
-        await signInWithEmail(
-          email,
-          password,
-        );
-
-      if (error) {
-        Alert.alert(
-          'Unable to sign in',
-          error.message,
-        );
-        return;
-      }
-
-      router.replace('/home');
-    } finally {
-      setWorking(false);
-    }
-  };
-
-  const handleCreateCareCircle = async () => {
   setWorking(true);
 
   try {
-    const careCircleId =
-      await createCareCircle('Our Family');
+    const { error } =
+      await signInWithEmail(
+        email,
+        password,
+      );
 
-    Alert.alert(
-      'Care circle created',
-      `ID: ${careCircleId}`,
-    );
+    if (error) {
+      Alert.alert(
+        'Unable to sign in',
+        error.message,
+      );
+      return;
+    }
+
+    await continueAfterSignIn();
   } catch (error) {
     console.error(
-      'Unable to create care circle:',
+      'Unable to continue after sign in:',
       error,
     );
 
     Alert.alert(
-      'Unable to create care circle',
+      'Unable to sign in',
       error instanceof Error
         ? error.message
         : 'Please try again.',
@@ -139,121 +151,109 @@ export default function AuthScreen() {
   }
 };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={
-          Platform.OS === 'ios'
-            ? 'padding'
-            : undefined
-        }
-        style={styles.keyboardView}
-      >
-        <View style={styles.content}>
-          <Text style={styles.eyebrow}>
-            PROJECT SPROUT
+return (
+  <SafeAreaView style={styles.safeArea}>
+    <KeyboardAvoidingView
+      behavior={
+        Platform.OS === 'ios'
+          ? 'padding'
+          : undefined
+      }
+      style={styles.keyboardView}
+    >
+      <View style={styles.content}>
+        <Text style={styles.eyebrow}>
+          PROJECT SPROUT
+        </Text>
+
+        <Text style={styles.title}>
+          Your care circle
+        </Text>
+
+        <Text style={styles.description}>
+          Sign in so the people you invite can
+          share the same baby care history.
+        </Text>
+
+        <View style={styles.form}>
+          <Text style={styles.label}>
+            Email
           </Text>
 
-          <Text style={styles.title}>
-            Your care circle
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            placeholderTextColor="#9AA29B"
+            style={styles.input}
+            value={email}
+          />
+
+          <Text style={styles.passwordLabel}>
+            Password
           </Text>
 
-          <Text style={styles.description}>
-            Sign in so the people you invite can
-            share the same baby care history.
-          </Text>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={setPassword}
+            placeholder="At least 8 characters"
+            placeholderTextColor="#9AA29B"
+            secureTextEntry
+            style={styles.input}
+            value={password}
+          />
+        </View>
 
-          <View style={styles.form}>
-            <Text style={styles.label}>
-              Email
-            </Text>
-
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor="#9AA29B"
-              style={styles.input}
-              value={email}
-            />
-
-            <Text style={styles.passwordLabel}>
-              Password
-            </Text>
-
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setPassword}
-              placeholder="At least 8 characters"
-              placeholderTextColor="#9AA29B"
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-          </View>
-
-          <View style={styles.footer}>
-            <Pressable
-              disabled={working}
-              onPress={handleSignIn}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-                working &&
-                  styles.disabledButton,
-              ]}
-            >
-              {working ? (
-                <ActivityIndicator
-                  color="#FFFFFF"
-                />
-              ) : (
-                <Text
-                  style={
-                    styles.primaryButtonText
-                  }
-                >
-                  Sign in
-                </Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              disabled={working}
-              onPress={handleSignUp}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
+        <View style={styles.footer}>
+          <Pressable
+            disabled={working}
+            onPress={handleSignIn}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+              working &&
+                styles.disabledButton,
+            ]}
+          >
+            {working ? (
+              <ActivityIndicator
+                color="#FFFFFF"
+              />
+            ) : (
               <Text
                 style={
-                  styles.secondaryButtonText
+                  styles.primaryButtonText
                 }
               >
-                Create account
+                Sign in
               </Text>
-            </Pressable>
-            <Pressable
+            )}
+          </Pressable>
+
+          <Pressable
             disabled={working}
-            onPress={handleCreateCareCircle}
+            onPress={handleSignUp}
             style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pressed,
+              styles.secondaryButton,
+              pressed && styles.pressed,
             ]}
+          >
+            <Text
+              style={
+                styles.secondaryButtonText
+              }
             >
-            <Text style={styles.secondaryButtonText}>
-                Create test care circle
+              Create account
             </Text>
-            </Pressable>
-          </View>
+          </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+      </View>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({

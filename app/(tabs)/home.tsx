@@ -23,6 +23,7 @@ import {
   BabyActivity,
   loadActivities,
 } from '../../lib/activities';
+import { getCurrentSession } from '../../lib/auth';
 import {
   BabyProfile,
   loadBabyProfile,
@@ -32,6 +33,12 @@ import {
   downloadCloudActivities,
 } from '../../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
+import {
+  deleteAllSproutData,
+} from '../../lib/dataControls';
+import {
+  loadSharedCareCircleId,
+} from '../../lib/sharedCareState';
 import {
   ActiveSleepSession,
   loadActiveSleepSession,
@@ -90,22 +97,50 @@ const loadHomeData = async () => {
     }
 
     try {
-      const circle =
-        await loadMyCareCircle();
+const circle =
+  await loadMyCareCircle();
 
-      if (circle) {
-        const cloudBaby =
-          await loadCloudBabyForCircle(
-            circle.id,
-          );
+if (circle) {
+  const cloudBaby =
+    await loadCloudBabyForCircle(
+      circle.id,
+    );
 
-        if (cloudBaby) {
-          await downloadCloudActivities(
-            cloudBaby.id,
-            savedProfile.id,
-          );
-        }
-      }
+  if (cloudBaby) {
+    await downloadCloudActivities(
+      cloudBaby.id,
+      savedProfile.id,
+    );
+  }
+} else {
+  const { data: sessionData } =
+    await getCurrentSession();
+
+  const previousCareCircleId =
+    await loadSharedCareCircleId();
+
+  if (
+    sessionData.session &&
+    previousCareCircleId
+  ) {
+    await deleteAllSproutData();
+
+    if (isActive) {
+      setProfile(null);
+      setActivities([]);
+      setActiveSleep(null);
+    }
+
+    router.replace('/');
+
+    Alert.alert(
+      'Care Circle access ended',
+      'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+    );
+
+    return;
+  }
+}
     } catch (syncError) {
       console.warn(
         'Unable to refresh shared activities:',
