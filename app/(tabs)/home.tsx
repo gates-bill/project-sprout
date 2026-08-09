@@ -337,6 +337,14 @@ const handleQuickAction = (label: string) => {
                 <Text style={styles.summaryLabel}>
                   Feedings
                 </Text>
+                {todaySummary.feedingsWithOunces > 0 && (
+                  <Text style={styles.summaryDetail}>
+                    {formatOunces(
+                      todaySummary.feedingOunces,
+                    )}{' '}
+                    oz total
+                  </Text>
+                )}
               </View>
 
               <View style={styles.summaryCard}>
@@ -347,6 +355,11 @@ const handleQuickAction = (label: string) => {
                 <Text style={styles.summaryLabel}>
                   Diapers
                 </Text>
+                {todaySummary.diaperDetails && (
+                  <Text style={styles.summaryDetail}>
+                    {todaySummary.diaperDetails}
+                  </Text>
+                )}
               </View>
 
               <View style={styles.summaryCard}>
@@ -358,6 +371,12 @@ const handleQuickAction = (label: string) => {
                 </Text>
                 <Text style={styles.summaryLabel}>
                   Sleep
+                </Text>
+                <Text style={styles.summaryDetail}>
+                  {todaySummary.sleepSessions}{' '}
+                  {todaySummary.sleepSessions === 1
+                    ? 'session'
+                    : 'sessions'}
                 </Text>
               </View>
 
@@ -569,8 +588,17 @@ function getTodaySummary(
   ).getTime();
 
   let feedings = 0;
+  let feedingsWithOunces = 0;
+  let feedingOunces = 0;
   let diapers = 0;
+  const diaperCounts = {
+    Wet: 0,
+    Dirty: 0,
+    Both: 0,
+    Dry: 0,
+  };
   let sleepMinutes = 0;
+  let sleepSessions = 0;
   let notes = 0;
 
   activities.forEach((activity) => {
@@ -587,15 +615,23 @@ function getTodaySummary(
     switch (activity.type) {
       case 'feeding':
         feedings += 1;
+
+        if (activity.amountOz !== null) {
+          feedingsWithOunces += 1;
+          feedingOunces += activity.amountOz;
+        }
+
         break;
 
       case 'diaper':
         diapers += 1;
+        diaperCounts[activity.diaperType] += 1;
         break;
 
       case 'sleep':
         sleepMinutes +=
           activity.durationMinutes;
+        sleepSessions += 1;
         break;
 
       case 'note':
@@ -606,10 +642,26 @@ function getTodaySummary(
 
   return {
     feedings,
+    feedingsWithOunces,
+    feedingOunces,
     diapers,
+    diaperDetails: Object.entries(diaperCounts)
+      .filter(([, count]) => count > 0)
+      .map(
+        ([type, count]) =>
+          `${count} ${type.toLowerCase()}`,
+      )
+      .join(' · '),
     sleepMinutes,
+    sleepSessions,
     notes,
   };
+}
+
+function formatOunces(ounces: number): string {
+  return String(
+    Number(ounces.toFixed(2)),
+  );
 }
 
 function formatSummarySleep(
@@ -902,5 +954,11 @@ summaryLabel: {
   color: '#768078',
   fontSize: 13,
   marginTop: 3,
+},
+summaryDetail: {
+  color: '#8B938C',
+  fontSize: 11,
+  lineHeight: 15,
+  marginTop: 5,
 },
 });
