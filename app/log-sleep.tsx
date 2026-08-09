@@ -162,52 +162,21 @@ export default function LogSleepScreen() {
         const circle =
           await loadMyCareCircle();
 
-        if (!circle) {
-          Alert.alert(
-            'Debug',
-            'No Care Circle was found.',
-          );
+        if (circle) {
+          const cloudBaby =
+            await loadCloudBabyForCircle(
+              circle.id,
+            );
 
-          router.back();
-          return;
+          if (cloudBaby) {
+            await syncActiveSleepToCloud(
+              sleepSession,
+              cloudBaby.id,
+            );
+          }
         }
-
-        const cloudBaby =
-          await loadCloudBabyForCircle(
-            circle.id,
-          );
-
-        if (!cloudBaby) {
-          Alert.alert(
-            'Debug',
-            'Care Circle found, but no cloud baby was found.',
-          );
-
-          router.back();
-          return;
-        }
-
-        Alert.alert(
-          'Debug',
-          `Cloud baby found: ${cloudBaby.id}`,
-        );
-
-        await syncActiveSleepToCloud(
-          sleepSession,
-          cloudBaby.id,
-        );
-      } catch (syncError) {
-        console.warn(
-          'Sleep started locally but could not sync:',
-          syncError,
-        );
-
-        Alert.alert(
-          'Active sleep sync failed',
-          syncError instanceof Error
-            ? syncError.message
-            : JSON.stringify(syncError),
-        );
+      } catch {
+        // The locally saved session remains pending for later sync.
       }
 
       router.back();
