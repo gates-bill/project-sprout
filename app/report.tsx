@@ -34,6 +34,7 @@ import {
   createVisitReport,
   VisitReport,
 } from '../lib/visitReport';
+import { shareVisitReportPdf } from '../lib/visitReportPdf';
 
 type RangeChoice = 7 | 14 | 30 | 'custom';
 type DateField = 'start' | 'end';
@@ -60,6 +61,7 @@ export default function ReportScreen() {
   const [activities, setActivities] =
     useState<BabyActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
   const [rangeChoice, setRangeChoice] =
     useState<RangeChoice>(7);
   const [startDate, setStartDate] =
@@ -209,6 +211,33 @@ export default function ReportScreen() {
     }
   };
 
+  const shareReport = async () => {
+    if (sharing || !profile || !report) {
+      return;
+    }
+
+    setSharing(true);
+
+    try {
+      await shareVisitReportPdf(
+        report,
+        profile.name,
+      );
+    } catch (error) {
+      console.error(
+        'Unable to share visit report:',
+        error,
+      );
+
+      Alert.alert(
+        'Unable to share report',
+        'Sprout could not create or share the PDF. Please try again.',
+      );
+    } finally {
+      setSharing(false);
+    }
+  };
+
   if (loading || !profile || !report) {
     return (
       <SafeAreaView style={styles.loadingScreen}>
@@ -322,6 +351,25 @@ export default function ReportScreen() {
             </View>
           )}
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={sharing}
+          onPress={shareReport}
+          style={({ pressed }) => [
+            styles.shareButton,
+            pressed && !sharing && styles.pressed,
+            sharing && styles.shareButtonDisabled,
+          ]}
+        >
+          {sharing ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.shareButtonText}>
+              Share report
+            </Text>
+          )}
+        </Pressable>
 
         {report.activityCount === 0 ? (
           <View style={styles.emptyCard}>
@@ -655,6 +703,23 @@ const styles = StyleSheet.create({
   },
   customRange: {
     marginTop: 12,
+  },
+  shareButton: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 17,
+    backgroundColor: '#48684D',
+    marginTop: 18,
+    paddingHorizontal: 20,
+  },
+  shareButtonDisabled: {
+    opacity: 0.65,
+  },
+  shareButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   dateFields: {
     flexDirection: 'row',
