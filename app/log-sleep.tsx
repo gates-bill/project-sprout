@@ -20,14 +20,12 @@ import {
 } from '../lib/activities';
 import { loadBabyProfile } from '../lib/babyProfile';
 import { loadMyCareCircle } from '../lib/careCircle';
-import {
-  syncActivityToCloud,
-} from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 import {
-  deleteCloudActiveSleep,
   syncActiveSleepToCloud,
+  syncPendingActiveSleep,
 } from '../lib/cloudSleepSession';
+import { createId } from '../lib/id';
 import {
   ActiveSleepSession,
   clearActiveSleepSession,
@@ -149,9 +147,10 @@ export default function LogSleepScreen() {
 
       const sleepSession: ActiveSleepSession = {
         babyProfileId,
+        sessionId: createId(),
         startedAt: now,
         createdAt: now,
-        syncStatus: 'pending',
+        syncStatus: 'pending-start',
       };
 
       await saveActiveSleepSession(
@@ -203,6 +202,22 @@ export default function LogSleepScreen() {
     setSaving(true);
 
     try {
+      if (
+        activeSleep.syncStatus === 'pending-end'
+      ) {
+        const circle = await loadMyCareCircle();
+        if (circle) {
+          const cloudBaby = await loadCloudBabyForCircle(
+            circle.id,
+          );
+          if (cloudBaby) {
+            await syncPendingActiveSleep(cloudBaby.id);
+          }
+        }
+        router.back();
+        return;
+      }
+
       const endedAt = new Date();
       const startedAt = new Date(
         activeSleep.startedAt,
@@ -222,7 +237,7 @@ export default function LogSleepScreen() {
         endedAt.toISOString();
 
       const sleepActivity: BabyActivity = {
-        id: Date.now().toString(),
+        id: createId(),
         babyProfileId:
           activeSleep.babyProfileId,
         type: 'sleep',
@@ -234,6 +249,19 @@ export default function LogSleepScreen() {
         occurredAt: endedAtIso,
         createdAt: endedAtIso,
       };
+
+      const pendingSession: ActiveSleepSession = {
+        ...activeSleep,
+        syncStatus: 'pending-end',
+        pendingEnd: {
+          operationId: createId(),
+          activityClientId: sleepActivity.id,
+          endedAt: endedAtIso,
+          note: sleepActivity.note,
+        },
+      };
+
+      await saveActiveSleepSession(pendingSession);
 
       await addActivity(
         sleepActivity,
@@ -250,14 +278,7 @@ export default function LogSleepScreen() {
             );
 
           if (cloudBaby) {
-            await syncActivityToCloud(
-              sleepActivity,
-              cloudBaby.id,
-            );
-
-            await deleteCloudActiveSleep(
-              cloudBaby.id,
-            );
+            await syncPendingActiveSleep(cloudBaby.id);
           }
         }
       } catch (syncError) {
@@ -271,8 +292,6 @@ export default function LogSleepScreen() {
           'The sleep entry was saved, but Sprout could not sync it with your Care Circle yet.',
         );
       }
-
-      await clearActiveSleepSession();
 
       router.back();
     } catch (error) {

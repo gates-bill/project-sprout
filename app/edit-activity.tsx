@@ -324,26 +324,35 @@ try {
     }
   }
 
-  const circle =
-    await loadMyCareCircle();
-
-  if (circle) {
-    const cloudBaby =
-      await loadCloudBabyForCircle(
-        circle.id,
-      );
-
-    if (cloudBaby) {
-      await syncActivityToCloud(
-        updatedActivity,
-        cloudBaby.id,
-      );
-    }
-  }
-
   await updateActivity(
     updatedActivity,
   );
+
+  try {
+    const circle = await loadMyCareCircle();
+
+    if (circle) {
+      const cloudBaby =
+        await loadCloudBabyForCircle(circle.id);
+
+      if (cloudBaby) {
+        await syncActivityToCloud(
+          updatedActivity,
+          cloudBaby.id,
+        );
+      }
+    }
+  } catch (syncError) {
+    console.warn(
+      'Activity edit queued for sync:',
+      syncError,
+    );
+
+    Alert.alert(
+      'Saved on this device',
+      'Your edit is saved and will sync when Sprout reconnects.',
+    );
+  }
 
   router.back();
     } catch (error) {

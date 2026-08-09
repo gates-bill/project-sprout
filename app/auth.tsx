@@ -14,9 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  requestPasswordReset,
+  resendConfirmationEmail,
   signInWithEmail,
   signUpWithEmail,
 } from '../lib/auth';
+import { getFriendlyAuthError } from '../lib/authErrors';
 
 import {
   loadMyCareCircle,
@@ -76,7 +79,7 @@ const continueAfterSignIn = async () => {
       if (error) {
         Alert.alert(
           'Unable to create account',
-          error.message,
+          getFriendlyAuthError(error),
         );
         return;
       }
@@ -128,7 +131,7 @@ const handleSignIn = async () => {
     if (error) {
       Alert.alert(
         'Unable to sign in',
-        error.message,
+        getFriendlyAuthError(error),
       );
       return;
     }
@@ -149,6 +152,36 @@ const handleSignIn = async () => {
   } finally {
     setWorking(false);
   }
+};
+
+const handleForgotPassword = async () => {
+  if (!email.trim()) {
+    Alert.alert('Email required', 'Enter your email address first.');
+    return;
+  }
+
+  const { error } = await requestPasswordReset(email);
+  Alert.alert(
+    error ? 'Unable to send reset link' : 'Check your email',
+    error
+      ? getFriendlyAuthError(error)
+      : 'If an account exists for that email, Supabase sent a password reset link.',
+  );
+};
+
+const handleResendConfirmation = async () => {
+  if (!email.trim()) {
+    Alert.alert('Email required', 'Enter your email address first.');
+    return;
+  }
+
+  const { error } = await resendConfirmationEmail(email);
+  Alert.alert(
+    error ? 'Unable to resend email' : 'Confirmation sent',
+    error
+      ? getFriendlyAuthError(error)
+      : 'Check your inbox for a new confirmation link.',
+  );
 };
 
 return (
@@ -232,6 +265,22 @@ return (
               </Text>
             )}
           </Pressable>
+
+          <View style={styles.recoveryRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleForgotPassword}
+            >
+              <Text style={styles.recoveryText}>Forgot password?</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleResendConfirmation}
+            >
+              <Text style={styles.recoveryText}>Resend confirmation</Text>
+            </Pressable>
+          </View>
 
           <Pressable
             disabled={working}
@@ -336,6 +385,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
+  },
+  recoveryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  recoveryText: {
+    color: '#657A68',
+    fontSize: 13,
+    fontWeight: '600',
   },
   secondaryButtonText: {
     color: '#48684D',

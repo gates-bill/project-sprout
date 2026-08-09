@@ -26,6 +26,7 @@ import {
   syncActivityToCloud,
 } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
+import { createId } from '../lib/id';
 
 const feedingMethods: FeedingMethod[] = [
   'Breast',
@@ -97,7 +98,7 @@ export default function LogFeedingScreen() {
       const occurredAtIso = occurredAt.toISOString();
 
       const feedingActivity: BabyActivity = {
-        id: Date.now().toString(),
+        id: createId(),
         babyProfileId: profile.id,
         type: 'feeding',
         feedingMethod,
@@ -113,11 +114,7 @@ export default function LogFeedingScreen() {
       await addActivity(feedingActivity);
 
 try {
-  console.log('Starting feeding cloud sync');
-
   const circle = await loadMyCareCircle();
-
-  console.log('Care circle:', circle);
 
   if (circle) {
     const cloudBaby =
@@ -125,16 +122,10 @@ try {
         circle.id,
       );
 
-    console.log('Cloud baby:', cloudBaby);
-
     if (cloudBaby) {
       await syncActivityToCloud(
         feedingActivity,
         cloudBaby.id,
-      );
-
-      console.log(
-        'Feeding cloud sync complete',
       );
     }
   }

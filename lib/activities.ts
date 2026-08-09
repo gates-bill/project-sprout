@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { createId } from './id';
+
 const ACTIVITIES_STORAGE_KEY =
   '@project-sprout/activities';
+
+const ACTIVITY_MUTATIONS_STORAGE_KEY =
+  '@project-sprout/activity-mutations';
 
 export type FeedingMethod =
   | 'Breast'
@@ -21,6 +26,20 @@ type BaseActivity = {
   occurredAt: string;
   createdAt: string;
   syncStatus?: 'pending' | 'synced';
+  cloudRevision?: number;
+  cloudUpdatedAt?: string;
+};
+
+export type ActivityMutation = {
+  operationId: string;
+  activityId: string;
+  babyProfileId: string;
+  kind: 'upsert' | 'delete';
+  expectedRevision: number;
+  activity: BabyActivity | null;
+  queuedAt: string;
+  attemptCount: number;
+  lastError: string | null;
 };
 
 export type FeedingActivity =
@@ -159,6 +178,14 @@ export async function deleteActivity(
 ): Promise<void> {
   const activities = await loadActivities();
 
+  const activity = activities.find(
+    (candidate) => candidate.id === activityId,
+  );
+
+  if (!activity) {
+    return;
+  }
+
   const updatedActivities =
     activities.filter(
       (activity) =>
@@ -166,6 +193,15 @@ export async function deleteActivity(
     );
 
   await saveActivities(updatedActivities);
+
+  await queueActivityMutation({
+    activityId: activity.id,
+    babyProfileId: activity.babyProfileId,
+    kind: 'delete',
+    expectedRevision:
+      activity.cloudRevision ?? 0,
+    activity: null,
+  });
 }
 
 export async function updateActivity(
@@ -189,15 +225,146 @@ export async function updateActivity(
   const updatedActivities =
     activities.map((activity) =>
       activity.id === updatedActivity.id
-        ? updatedActivity
+        ? {
+            ...updatedActivity,
+            syncStatus: 'pending' as const,
+          }
         : activity,
     );
 
   await saveActivities(updatedActivities);
 }
 
+export async function loadActivityMutations():
+  Promise<ActivityMutation[]> {
+  try {
+    const stored = await AsyncStorage.getItem(
+      ACTIVITY_MUTATIONS_STORAGE_KEY,
+    );
+
+    if (!stored) {
+      return [];
+    }
+
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed)
+      ? parsed as ActivityMutation[]
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function queueActivityUpsert(
+  activity: BabyActivity,
+): Promise<ActivityMutation> {
+  return queueActivityMutation({
+    activityId: activity.id,
+    babyProfileId: activity.babyProfileId,
+    kind: 'upsert',
+    expectedRevision:
+      activity.cloudRevision ?? 0,
+    activity: {
+      ...activity,
+      syncStatus: 'pending',
+    },
+  });
+}
+
+export async function removeActivityMutation(
+  operationId: string,
+): Promise<void> {
+  const mutations = await loadActivityMutations();
+  await saveActivityMutations(
+    mutations.filter(
+      (mutation) =>
+        mutation.operationId !== operationId,
+    ),
+  );
+}
+
+export async function removeActivityMutationsForActivity(
+  activityId: string,
+): Promise<void> {
+  const mutations = await loadActivityMutations();
+  await saveActivityMutations(
+    mutations.filter(
+      (mutation) => mutation.activityId !== activityId,
+    ),
+  );
+}
+
+export async function discardLocalActivity(
+  activityId: string,
+): Promise<void> {
+  const activities = await loadActivities();
+  await saveActivities(
+    activities.filter(
+      (activity) => activity.id !== activityId,
+    ),
+  );
+  await removeActivityMutationsForActivity(activityId);
+}
+
+export async function recordActivityMutationFailure(
+  operationId: string,
+  message: string,
+): Promise<void> {
+  const mutations = await loadActivityMutations();
+  await saveActivityMutations(
+    mutations.map((mutation) =>
+      mutation.operationId === operationId
+        ? {
+            ...mutation,
+            attemptCount: mutation.attemptCount + 1,
+            lastError: message,
+          }
+        : mutation,
+    ),
+  );
+}
+
+async function queueActivityMutation(
+  input: Omit<
+    ActivityMutation,
+    'operationId' | 'queuedAt' |
+    'attemptCount' | 'lastError'
+  >,
+): Promise<ActivityMutation> {
+  const mutations = await loadActivityMutations();
+  const retained = mutations.filter(
+    (mutation) =>
+      mutation.activityId !== input.activityId,
+  );
+  const mutation: ActivityMutation = {
+    ...input,
+    operationId: createId(),
+    queuedAt: new Date().toISOString(),
+    attemptCount: 0,
+    lastError: null,
+  };
+
+  await saveActivityMutations([
+    ...retained,
+    mutation,
+  ]);
+
+  return mutation;
+}
+
+async function saveActivityMutations(
+  mutations: ActivityMutation[],
+): Promise<void> {
+  await AsyncStorage.setItem(
+    ACTIVITY_MUTATIONS_STORAGE_KEY,
+    JSON.stringify(mutations),
+  );
+}
+
 export async function markActivitySynced(
   activityId: string,
+  cloudRevision?: number,
+  cloudUpdatedAt?: string,
 ): Promise<void> {
   const activities = await loadActivities();
 
@@ -207,6 +374,10 @@ export async function markActivitySynced(
         ? {
             ...activity,
             syncStatus: 'synced' as const,
+            cloudRevision:
+              cloudRevision ?? activity.cloudRevision,
+            cloudUpdatedAt:
+              cloudUpdatedAt ?? activity.cloudUpdatedAt,
           }
         : activity,
     );

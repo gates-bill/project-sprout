@@ -13,6 +13,11 @@ import {
   loadSharedCareCircleId,
   saveSharedCareCircleId,
 } from './sharedCareState';
+import {
+  bindCacheToSharedAccount,
+  loadLocalAccessBinding,
+} from './localAccess';
+import { syncPendingProfileUpdate } from './profileMutation';
 
 export type BabyAccessResult =
   | {
@@ -35,8 +40,19 @@ export async function loadAccessibleBabyProfile():
   let profile = await loadBabyProfile();
 
   const { data } = await getCurrentSession();
+  const binding = await loadLocalAccessBinding();
+  const previousCareCircleId =
+    await loadSharedCareCircleId();
 
   if (!data.session) {
+    if (
+      binding?.mode === 'shared' ||
+      previousCareCircleId
+    ) {
+      await deleteAllSproutData();
+      return { status: 'signed-out' };
+    }
+
     return profile
       ? {
           status: 'ready',
@@ -46,24 +62,37 @@ export async function loadAccessibleBabyProfile():
       : { status: 'signed-out' };
   }
 
+  if (
+    binding?.mode === 'shared' &&
+    binding.userId !== data.session.user.id
+  ) {
+    await deleteAllSproutData();
+    profile = null;
+  }
+
   let circle;
 
   try {
     circle = await loadMyCareCircle();
   } catch (error) {
-    if (profile) {
+    if (
+      profile &&
+      binding?.mode === 'shared' &&
+      binding.userId === data.session.user.id
+    ) {
       return {
         status: 'ready',
         profile,
-        circle: null,
+        circle: {
+          id: binding.careCircleId,
+          name: binding.careCircleName,
+          role: binding.role,
+        },
       };
     }
 
     throw error;
   }
-
-  const previousCareCircleId =
-    await loadSharedCareCircleId();
 
   if (!circle) {
     if (previousCareCircleId) {
@@ -84,6 +113,22 @@ export async function loadAccessibleBabyProfile():
   }
 
   await saveSharedCareCircleId(circle.id);
+
+  await bindCacheToSharedAccount({
+    userId: data.session.user.id,
+    careCircleId: circle.id,
+    careCircleName: circle.name,
+    role: circle.role,
+  });
+
+  try {
+    await syncPendingProfileUpdate(circle.id);
+  } catch (error) {
+    console.warn(
+      'Pending shared baby profile update remains queued:',
+      error,
+    );
+  }
 
   try {
     const cloudProfile =

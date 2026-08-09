@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import { loadActivities } from './activities';
@@ -8,6 +8,7 @@ import {
   clearAllProfilePhotos,
 } from './profilePhoto';
 import { loadActiveSleepSession } from './sleepSession';
+import { clearLocalAccessBinding } from './localAccess';
 
 const SPROUT_STORAGE_PREFIX = '@project-sprout/';
 
@@ -57,7 +58,13 @@ export async function exportSproutData(): Promise<void> {
     );
   }
 
-  await Sharing.shareAsync(file.uri);
+  try {
+    await Sharing.shareAsync(file.uri);
+  } finally {
+    if (file.exists) {
+      file.delete();
+    }
+  }
 }
 
 export async function deleteAllSproutData(): Promise<void> {
@@ -73,8 +80,25 @@ export async function deleteAllSproutData(): Promise<void> {
     );
   }
 
-  const remainingKeys =
-    await AsyncStorage.getAllKeys();
-
   clearAllProfilePhotos();
+  await clearGeneratedSproutFiles();
+  await clearLocalAccessBinding();
+}
+
+function clearGeneratedSproutFiles(): void {
+  const cacheDirectory = new Directory(Paths.cache);
+
+  if (!cacheDirectory.exists) return;
+
+  for (const entry of cacheDirectory.list()) {
+    if (
+      entry instanceof File &&
+      (
+        entry.name.startsWith('Sprout-Report-') ||
+        entry.name.startsWith('project-sprout-export-')
+      )
+    ) {
+      entry.delete();
+    }
+  }
 }

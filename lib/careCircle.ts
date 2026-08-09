@@ -36,12 +36,14 @@ export async function loadMyCareCircle():
   const { data, error } = await supabase
     .from('care_circle_members')
     .select(`
+      created_at,
       role,
       care_circles (
         id,
         name
       )
     `)
+    .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -119,4 +121,19 @@ export async function removeCareCircleMember(
   if (error) {
     throw error;
   }
+}
+
+export async function transferCareCircleOwnership(
+  careCircleId: string,
+  newOwnerUserId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    'transfer_care_circle_ownership',
+    {
+      circle_id: careCircleId,
+      new_owner_user_id: newOwnerUserId,
+    },
+  );
+
+  if (error) throw error;
 }

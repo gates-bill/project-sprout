@@ -23,7 +23,7 @@ import {
 
 import { loadMyCareCircle } from '../../lib/careCircle';
 import {
-  deleteCloudActivity,
+  syncPendingActivitiesToCloud,
 } from '../../lib/cloudActivities';
 import {
   loadCloudBabyForCircle,
@@ -125,23 +125,35 @@ const handleDelete = async () => {
   setDeleting(true);
 
   try {
-    const circle = await loadMyCareCircle();
-
-    if (circle) {
-      const cloudBaby =
-        await loadCloudBabyForCircle(
-          circle.id,
-        );
-
-      if (cloudBaby) {
-        await deleteCloudActivity(
-          cloudBaby.id,
-          activity.id,
-        );
-      }
-    }
-
     await deleteActivity(activity.id);
+
+    try {
+      const circle = await loadMyCareCircle();
+
+      if (circle) {
+        const cloudBaby =
+          await loadCloudBabyForCircle(
+            circle.id,
+          );
+
+        if (cloudBaby) {
+          await syncPendingActivitiesToCloud(
+            cloudBaby.id,
+            activity.babyProfileId,
+          );
+        }
+      }
+    } catch (syncError) {
+      console.warn(
+        'Activity deletion queued for sync:',
+        syncError,
+      );
+
+      Alert.alert(
+        'Deleted on this device',
+        'The shared deletion will sync when Sprout reconnects.',
+      );
+    }
 
     router.back();
   } catch (error) {

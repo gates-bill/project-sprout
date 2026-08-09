@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +19,7 @@ import { deleteAccount } from '../../lib/accountDeletion';
 import {
   clearLocalAuthSession,
   getCurrentSession,
+  signInWithEmail,
   signOut
 } from '../../lib/auth';
 import { loadBabyProfile } from '../../lib/babyProfile';
@@ -27,6 +29,7 @@ import {
   loadCareCircleMembers,
   loadMyCareCircle,
   removeCareCircleMember,
+  transferCareCircleOwnership,
 } from '../../lib/careCircle';
 import {
   acceptCareCircleInvite,
@@ -34,6 +37,7 @@ import {
 } from '../../lib/careCircleInvites';
 import {
   createCloudBaby,
+  hydrateLocalBabyFromCloud,
   loadCloudBabyForCircle,
 } from '../../lib/cloudBaby';
 import {
@@ -177,6 +181,25 @@ export default function SettingsScreen() {
   };
 
   const confirmAccountDeletionAgain = () => {
+    if (Platform.OS === 'ios' && signedInEmail) {
+      Alert.prompt(
+        'Confirm your password',
+        'Re-enter your password before permanently deleting the account.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Continue',
+            style: 'destructive',
+            onPress: (password?: string) => {
+              void reauthenticateAndDelete(password ?? '');
+            },
+          },
+        ],
+        'secure-text',
+      );
+      return;
+    }
+
     Alert.alert(
       'Permanently delete account',
       'This cannot be undone. If you own a Care Circle with other caregivers, deletion will be blocked so their shared data is protected.',
@@ -192,6 +215,30 @@ export default function SettingsScreen() {
         },
       ],
     );
+  };
+
+  const reauthenticateAndDelete = async (
+    password: string,
+  ) => {
+    if (!signedInEmail || !password) {
+      Alert.alert('Password required', 'Account deletion was cancelled.');
+      return;
+    }
+
+    const { error } = await signInWithEmail(
+      signedInEmail,
+      password,
+    );
+
+    if (error) {
+      Alert.alert(
+        'Password not confirmed',
+        'The password was incorrect. Your account was not deleted.',
+      );
+      return;
+    }
+
+    await handleDeleteAccount();
   };
 
   const handleDeleteAccount = async () => {
@@ -312,6 +359,13 @@ useEffect(() => {
         await createCareCircle('Our Family');
 
         setCareCircleId(careCircleId);
+
+        await saveSharedCareCircleId(careCircleId);
+        setCareCircleRole('owner');
+        const members = await loadCareCircleMembers(
+          careCircleId,
+        );
+        setCareCircleMembers(members);
 
         Alert.alert(
         'Care circle created',
@@ -440,6 +494,15 @@ const handleJoinCircle = async () => {
       cloudBaby?.id ?? null,
     );
 
+    const refreshedCircle = await loadMyCareCircle();
+    if (refreshedCircle) {
+      setCareCircleRole(refreshedCircle.role);
+      setCareCircleMembers(
+        await loadCareCircleMembers(joinedCircleId),
+      );
+      await hydrateLocalBabyFromCloud(joinedCircleId);
+    }
+
     setInviteCode('');
 
     Alert.alert(
@@ -527,6 +590,8 @@ const handleRemoveCaregiver = (
 
 const handleSignOut = async () => {
   try {
+    await deleteAllSproutData();
+
     const { error } = await signOut();
 
     if (error) {
@@ -536,8 +601,6 @@ const handleSignOut = async () => {
       );
       return;
     }
-
-    await deleteAllSproutData();
 
     setSignedInEmail(null);
     setCareCircleId(null);
@@ -562,6 +625,43 @@ const handleSignOut = async () => {
       'Please try again.',
     );
   }
+};
+
+const handleTransferOwnership = (
+  member: CareCircleMember,
+) => {
+  if (!careCircleId || careCircleRole !== 'owner') return;
+
+  Alert.alert(
+    'Transfer ownership?',
+    `${member.email} will become the Care Circle owner. You will remain as a caregiver.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Transfer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await transferCareCircleOwnership(
+              careCircleId,
+              member.userId,
+            );
+            setCareCircleRole('caregiver');
+            setCareCircleMembers(
+              await loadCareCircleMembers(careCircleId),
+            );
+          } catch (error) {
+            Alert.alert(
+              'Unable to transfer ownership',
+              error instanceof Error
+                ? error.message
+                : 'Please try again.',
+            );
+          }
+        },
+      },
+    ],
+  );
 };
 
 const handleCopyInvite = async () => {
@@ -735,6 +835,22 @@ const handleShareInvite = async () => {
 
             {careCircleRole === 'owner' &&
               member.role === 'caregiver' && (
+                <View style={styles.memberActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    handleTransferOwnership(member)
+                  }
+                  style={({ pressed }) => [
+                    styles.transferMemberButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.transferMemberText}>
+                    Make owner
+                  </Text>
+                </Pressable>
+
                 <Pressable
                   accessibilityRole="button"
                   disabled={
@@ -768,13 +884,14 @@ const handleShareInvite = async () => {
                     </Text>
                   )}
                 </Pressable>
+                </View>
               )}
           </View>
         ),
       )}
     </View>
   )}
-    {careCircleId && (
+    {careCircleId && careCircleRole === 'owner' && (
   <Pressable
     accessibilityRole="button"
     disabled={creatingInvite}
@@ -862,6 +979,20 @@ const handleShareInvite = async () => {
 )}
 
 {signedInEmail && (
+  <>
+  <Pressable
+    accessibilityRole="button"
+    onPress={() => router.push('/reset-password')}
+    style={({ pressed }) => [
+      styles.signOutButton,
+      pressed && styles.pressed,
+    ]}
+  >
+    <Text style={styles.signOutButtonText}>
+      Change password
+    </Text>
+  </Pressable>
+
   <Pressable
     accessibilityRole="button"
     onPress={handleSignOut}
@@ -874,6 +1005,7 @@ const handleShareInvite = async () => {
       Sign out
     </Text>
   </Pressable>
+  </>
 )}
 
         </View>
@@ -1317,6 +1449,19 @@ inviteActionText: {
 },
 membersSection: {
   marginTop: 14,
+},
+memberActions: {
+  alignItems: 'flex-end',
+  gap: 6,
+},
+transferMemberButton: {
+  paddingHorizontal: 8,
+  paddingVertical: 5,
+},
+transferMemberText: {
+  color: '#48684D',
+  fontSize: 12,
+  fontWeight: '700',
 },
 membersTitle: {
   color: '#304435',

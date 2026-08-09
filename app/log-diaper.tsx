@@ -26,6 +26,7 @@ import {
   syncActivityToCloud,
 } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
+import { createId } from '../lib/id';
 
 const diaperTypes: {
   type: DiaperType;
@@ -82,7 +83,7 @@ const createdAt = new Date().toISOString();
 const occurredAtIso = occurredAt.toISOString();
 
 const diaperActivity: BabyActivity = {
-  id: Date.now().toString(),
+  id: createId(),
   babyProfileId: profile.id,
   type: 'diaper',
   diaperType,

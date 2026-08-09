@@ -1,4 +1,4 @@
-import {
+import type {
   BabyActivity,
   DiaperType,
   FeedingMethod,
@@ -8,6 +8,8 @@ export type ReportDateRange = {
   startDate: Date;
   endDate: Date;
 };
+
+export const MAX_REPORT_DAYS = 366;
 
 export type VisitReport = {
   startDate: Date;
@@ -83,6 +85,12 @@ export function createVisitReport(
     endDate,
   );
 
+  if (dayCount > MAX_REPORT_DAYS) {
+    throw new Error(
+      `Visit reports are limited to ${MAX_REPORT_DAYS} days.`,
+    );
+  }
+
   const includedActivities = activities.filter(
     (activity) => {
       const occurredAt = new Date(
@@ -108,6 +116,15 @@ export function createVisitReport(
   let diaperCount = 0;
   let sleepMinutes = 0;
   let sleepSessionCount = 0;
+
+  for (let offset = 0; offset < dayCount; offset += 1) {
+    const date = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth(),
+      startDate.getDate() + offset,
+    );
+    dailyReports.set(createDateKey(date), createDailyReport(date));
+  }
 
   includedActivities.forEach((activity) => {
     const occurredAt = new Date(activity.occurredAt);

@@ -8,10 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getCurrentSession } from '../lib/auth';
-import { loadBabyProfile } from '../lib/babyProfile';
-import { loadMyCareCircle } from '../lib/careCircle';
-import { hydrateLocalBabyFromCloud } from '../lib/cloudBaby';
+import { loadAccessibleBabyProfile } from '../lib/babyAccess';
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -23,42 +20,19 @@ useEffect(() => {
 
   const checkForSavedProfile = async () => {
     try {
-      const savedProfile =
-        await loadBabyProfile();
+      const access =
+        await loadAccessibleBabyProfile();
 
-      if (savedProfile) {
+      if (access.status === 'ready') {
         router.replace('/home');
         return;
       }
 
-      const { data } =
-        await getCurrentSession();
-
-      const session = data.session;
-
-      if (!session) {
+      if (access.status === 'signed-out') {
         if (isMounted) {
           setCheckingProfile(false);
         }
 
-        return;
-      }
-
-      const circle =
-        await loadMyCareCircle();
-
-      if (!circle) {
-        router.replace('/settings');
-        return;
-      }
-
-      const hydratedProfile =
-        await hydrateLocalBabyFromCloud(
-          circle.id,
-        );
-
-      if (hydratedProfile) {
-        router.replace('/home');
         return;
       }
 
@@ -152,7 +126,7 @@ if (checkingProfile) {
 </Pressable>
 
           <Text style={styles.placeholderNote}>
-            Project Sprout is our temporary working name.
+            Private, shared care for your family.
           </Text>
         </View>
       </View>

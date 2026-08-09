@@ -21,15 +21,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     BabyProfile,
+    loadBabyProfile,
     saveBabyProfile,
 } from '../lib/babyProfile';
 import { loadAccessibleBabyProfile } from '../lib/babyAccess';
 import { CareCircleSummary } from '../lib/careCircle';
-import { updateCloudBabyProfile } from '../lib/cloudBaby';
 import {
-  deleteCloudBabyPhoto,
-  uploadCloudBabyPhoto,
-} from '../lib/cloudBabyPhoto';
+  formatDateOnly,
+  parseDateOnly,
+  validateBirthDate,
+} from '../lib/dateOnly';
+import {
+  queueProfileUpdate,
+  syncPendingProfileUpdate,
+} from '../lib/profileMutation';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -84,7 +89,7 @@ export default function EditProfileScreen() {
         setCircle(profileResult.circle);
         setName(savedProfile.name);
         setBirthDate(
-          new Date(savedProfile.birthDate),
+          parseDateOnly(savedProfile.birthDate),
         );
         setPhotoUri(savedProfile.photoUri);
       } catch (error) {
@@ -190,103 +195,54 @@ export default function EditProfileScreen() {
 
     setSaving(true);
 
+    const birthDateError = validateBirthDate(birthDate);
+    if (birthDateError) {
+      Alert.alert('Check the birth date', birthDateError);
+      setSaving(false);
+      return;
+    }
+
     try {
       const updatedName = name.trim();
       const updatedBirthDate =
-        birthDate.toISOString();
+        formatDateOnly(birthDate);
 
-      let savedName = updatedName;
-      let savedBirthDate = updatedBirthDate;
-      let savedCloudPhotoPath =
-        profile.cloudPhotoPath;
+      const photoChanged =
+        photoUri !== profile.photoUri ||
+        Boolean(photoUri && !profile.cloudPhotoPath);
+      const updatedProfile: BabyProfile = {
+        ...profile,
+        name: updatedName,
+        birthDate: updatedBirthDate,
+        photoUri,
+      };
 
-      if (circle) {
-        const previousCloudPhotoPath =
-          profile.cloudPhotoPath ?? null;
-        const photoChanged =
-          photoUri !== profile.photoUri ||
-          Boolean(
-            photoUri &&
-            !previousCloudPhotoPath,
-          );
-        let uploadedPhotoPath: string | null = null;
+      await saveBabyProfile(updatedProfile);
+      const persistedProfile = await loadBabyProfile();
 
-        if (photoChanged && photoUri) {
-          uploadedPhotoPath =
-            await uploadCloudBabyPhoto(
-              circle.id,
-              photoUri,
-            );
-        }
-
-        let cloudBaby;
-
-        try {
-          cloudBaby =
-            await updateCloudBabyProfile(
-              circle.id,
-              {
-                name: updatedName,
-                birthDate: updatedBirthDate,
-                ...(photoChanged
-                  ? {
-                      photoPath:
-                        uploadedPhotoPath,
-                    }
-                  : {}),
-              },
-            );
-        } catch (error) {
-          if (uploadedPhotoPath) {
-            try {
-              await deleteCloudBabyPhoto(
-                uploadedPhotoPath,
-              );
-            } catch (cleanupError) {
-              console.warn(
-                'Unable to clean up an unused shared baby photo:',
-                cleanupError,
-              );
-            }
-          }
-
-          throw error;
-        }
-
-        savedName = cloudBaby.name;
-        savedBirthDate = cloudBaby.birthDate;
-
-        if (photoChanged) {
-          savedCloudPhotoPath =
-            cloudBaby.photoPath;
-
-          if (
-            previousCloudPhotoPath &&
-            previousCloudPhotoPath !==
-              cloudBaby.photoPath
-          ) {
-            try {
-              await deleteCloudBabyPhoto(
-                previousCloudPhotoPath,
-              );
-            } catch (cleanupError) {
-              console.warn(
-                'Unable to remove the previous shared baby photo:',
-                cleanupError,
-              );
-            }
-          }
-        }
+      if (!persistedProfile) {
+        throw new Error('The saved baby profile is unavailable.');
       }
 
-      await saveBabyProfile({
-        ...profile,
-        name: savedName,
-        birthDate: savedBirthDate,
-        photoUri,
-        cloudPhotoPath:
-          savedCloudPhotoPath,
-      });
+      if (circle) {
+        await queueProfileUpdate(
+          persistedProfile,
+          photoChanged,
+        );
+
+        try {
+          await syncPendingProfileUpdate(circle.id);
+        } catch (syncError) {
+          console.warn(
+            'Shared profile update is queued for retry:',
+            syncError,
+          );
+          Alert.alert(
+            'Saved on this device',
+            'Sprout will share these profile changes when you are back online.',
+          );
+        }
+      }
 
       router.back();
     } catch (error) {
@@ -356,6 +312,11 @@ export default function EditProfileScreen() {
 
           <View style={styles.photoSection}>
             <Pressable
+              accessibilityLabel={
+                photoUri
+                  ? 'Change baby profile photo'
+                  : 'Add baby profile photo'
+              }
               accessibilityRole="button"
               onPress={pickPhoto}
               style={({ pressed }) => [

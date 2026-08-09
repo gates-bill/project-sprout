@@ -21,6 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   BabyActivity,
+  loadActivityMutations,
   loadActivities,
 } from '../../lib/activities';
 import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
@@ -34,6 +35,7 @@ import {
 import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 import {
   loadCloudActiveSleep,
+  syncPendingActiveSleep,
 } from '../../lib/cloudSleepSession';
 import {
   ActiveSleepSession,
@@ -57,6 +59,8 @@ export default function HomeScreen() {
   const [activeSleep, setActiveSleep] =
     useState<ActiveSleepSession | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [syncNotice, setSyncNotice] =
+    useState<string | null>(null);
   const todaySummary = getTodaySummary(activities);
 
   useEffect(() => {
@@ -119,19 +123,44 @@ if (circle) {
     );
 
 if (cloudBaby) {
-  await syncPendingActivitiesToCloud(
-    cloudBaby.id,
-  );
+  try {
+    await syncPendingActiveSleep(cloudBaby.id);
+  } catch {
+    // A pending sleep operation remains durable for the next refresh.
+  }
 
-  await downloadCloudActivities(
+  const activitySync = await syncPendingActivitiesToCloud(
     cloudBaby.id,
     savedProfile.id,
   );
 
-  await loadCloudActiveSleep(
-    cloudBaby.id,
-    savedProfile.id,
-  );
+  try {
+    await downloadCloudActivities(
+      cloudBaby.id,
+      savedProfile.id,
+    );
+  } catch {
+    // Keep locally available activities when download is unavailable.
+  }
+
+  try {
+    await loadCloudActiveSleep(
+      cloudBaby.id,
+      savedProfile.id,
+    );
+  } catch {
+    // Keep the local active-sleep state when cloud refresh is unavailable.
+  }
+
+  if (isActive) {
+    setSyncNotice(
+      activitySync.failed > 0
+        ? `${activitySync.failed} change${activitySync.failed === 1 ? '' : 's'} waiting to sync`
+        : activitySync.conflicts > 0
+          ? 'A newer shared change was kept'
+          : null,
+    );
+  }
 }
 }
     } catch (syncError) {
@@ -143,6 +172,9 @@ if (cloudBaby) {
 
     const savedActivities =
       await loadActivities();
+
+    const pendingMutations =
+      await loadActivityMutations();
 
     const refreshedActiveSleep =
       await loadActiveSleepSession();
@@ -163,12 +195,20 @@ if (cloudBaby) {
       });
 
     if (isActive) {
+      if (pendingMutations.length > 0) {
+        setSyncNotice((currentNotice) =>
+          currentNotice ??
+          `${pendingMutations.length} change${pendingMutations.length === 1 ? '' : 's'} waiting to sync`,
+        );
+      }
       setProfile(savedProfile);
       setActivities(todaysActivities);
 
       setActiveSleep(
         refreshedActiveSleep?.babyProfileId ===
-          savedProfile.id
+          savedProfile.id &&
+        refreshedActiveSleep.syncStatus !==
+          'pending-end'
           ? refreshedActiveSleep
           : null,
       );
@@ -306,6 +346,14 @@ const handleQuickAction = (label: string) => {
           </Text>
         </Pressable>
       )}
+
+        {syncNotice && (
+          <View style={styles.syncNotice}>
+            <Text style={styles.syncNoticeText}>
+              {syncNotice}
+            </Text>
+          </View>
+        )}
 
         {activities.length === 0 && !activeSleep && (
           <View style={styles.emptyCard}>
@@ -746,6 +794,18 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingHorizontal: 24,
     paddingVertical: 25,
+  },
+  syncNotice: {
+    borderRadius: 12,
+    backgroundColor: '#F0F3EC',
+    marginTop: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  syncNoticeText: {
+    color: '#657569',
+    fontSize: 12,
+    textAlign: 'center',
   },
   cardIcon: {
     fontSize: 31,

@@ -25,6 +25,7 @@ import {
   syncActivityToCloud,
 } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
+import { createId } from '../lib/id';
 
 export default function LogManualSleepScreen() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function LogManualSleepScreen() {
 const createdAt = new Date().toISOString();
 
 const sleepActivity: BabyActivity = {
-  id: Date.now().toString(),
+  id: createId(),
   babyProfileId: profile.id,
   type: 'sleep',
   startedAt: startedAt.toISOString(),

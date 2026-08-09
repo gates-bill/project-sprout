@@ -50,11 +50,17 @@ export async function shareVisitReportPdf(
 
   generatedFile.move(sharedFile);
 
-  await Sharing.shareAsync(sharedFile.uri, {
-    dialogTitle: 'Share visit report',
-    mimeType: 'application/pdf',
-    UTI: 'com.adobe.pdf',
-  });
+  try {
+    await Sharing.shareAsync(sharedFile.uri, {
+      dialogTitle: 'Share visit report',
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+    });
+  } finally {
+    if (sharedFile.exists) {
+      sharedFile.delete();
+    }
+  }
 }
 
 export function createReportFilename(

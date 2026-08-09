@@ -32,6 +32,7 @@ import { downloadCloudActivities } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 import {
   createVisitReport,
+  MAX_REPORT_DAYS,
   VisitReport,
 } from '../lib/visitReport';
 import { shareVisitReportPdf } from '../lib/visitReportPdf';
@@ -116,9 +117,19 @@ export default function ReportScreen() {
                 );
 
               if (cloudBaby) {
+                const cloudRangeEnd = new Date();
+                const cloudRangeStart = new Date(
+                  cloudRangeEnd.getFullYear(),
+                  cloudRangeEnd.getMonth(),
+                  cloudRangeEnd.getDate() - (MAX_REPORT_DAYS - 1),
+                );
                 await downloadCloudActivities(
                   cloudBaby.id,
                   savedProfile.id,
+                  {
+                    startDate: cloudRangeStart,
+                    endDate: cloudRangeEnd,
+                  },
                 );
               }
             }
@@ -193,6 +204,30 @@ export default function ReportScreen() {
     }
 
     if (!selectedDate || !activeDateField) {
+      return;
+    }
+
+    const proposedStart =
+      activeDateField === 'start' ? selectedDate : startDate;
+    const proposedEnd =
+      activeDateField === 'end' ? selectedDate : endDate;
+    const proposedDays = Math.floor(
+      (Date.UTC(
+        proposedEnd.getFullYear(),
+        proposedEnd.getMonth(),
+        proposedEnd.getDate(),
+      ) - Date.UTC(
+        proposedStart.getFullYear(),
+        proposedStart.getMonth(),
+        proposedStart.getDate(),
+      )) / 86400000,
+    ) + 1;
+
+    if (proposedDays > MAX_REPORT_DAYS) {
+      Alert.alert(
+        'Choose a shorter range',
+        `Visit reports can include up to ${MAX_REPORT_DAYS} days.`,
+      );
       return;
     }
 
@@ -281,7 +316,9 @@ export default function ReportScreen() {
 
               return (
                 <Pressable
+                  accessibilityLabel={`${choice.label} report range`}
                   accessibilityRole="button"
+                  accessibilityState={{ selected }}
                   key={choice.label}
                   onPress={() => selectRange(choice.value)}
                   style={({ pressed }) => [
@@ -489,6 +526,7 @@ function DateFieldButton({
 }) {
   return (
     <Pressable
+      accessibilityLabel={`${label} date, ${formatShortDate(date)}`}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [

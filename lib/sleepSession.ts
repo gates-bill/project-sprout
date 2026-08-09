@@ -1,15 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ACTIVE_SLEEP_STORAGE_KEY =
-  '@project-sprout/active-sleep-session';
+export type PendingSleepEnd = {
+  operationId: string;
+  activityClientId: string;
+  endedAt: string;
+  note: string | null;
+};
 
 export type ActiveSleepSession = {
   babyProfileId: string;
   cloudBabyId?: string;
+  sessionId: string;
   startedAt: string;
   createdAt: string;
-  syncStatus?: 'pending' | 'synced';
+  syncStatus: 'pending-start' | 'synced' | 'pending-end';
+  pendingEnd?: PendingSleepEnd;
 };
+
+const ACTIVE_SLEEP_STORAGE_KEY =
+  '@project-sprout/active-sleep-session';
 
 export async function loadActiveSleepSession():
   Promise<ActiveSleepSession | null> {
@@ -22,26 +31,30 @@ export async function loadActiveSleepSession():
       return null;
     }
 
-    const parsedSession: unknown = JSON.parse(storedSession);
+    const parsed = JSON.parse(storedSession) as
+      Partial<ActiveSleepSession> & {
+        syncStatus?: string;
+      };
 
-    if (
-      !parsedSession ||
-      typeof parsedSession !== 'object' ||
-      !('babyProfileId' in parsedSession) ||
-      !('startedAt' in parsedSession) ||
-      typeof parsedSession.babyProfileId !== 'string' ||
-      typeof parsedSession.startedAt !== 'string'
-    ) {
-      await clearActiveSleepSession();
-      return null;
-    }
-
-    return parsedSession as ActiveSleepSession;
+    return {
+      babyProfileId: parsed.babyProfileId ?? '',
+      cloudBabyId: parsed.cloudBabyId,
+      sessionId:
+        parsed.sessionId ??
+        `legacy-${parsed.createdAt ?? parsed.startedAt}`,
+      startedAt: parsed.startedAt ?? '',
+      createdAt:
+        parsed.createdAt ?? parsed.startedAt ?? '',
+      syncStatus:
+        parsed.syncStatus === 'pending-end'
+          ? 'pending-end'
+          : parsed.syncStatus === 'synced'
+            ? 'synced'
+            : 'pending-start',
+      pendingEnd: parsed.pendingEnd,
+    };
   } catch (error) {
     console.error('Unable to load active sleep:', error);
-
-    await clearActiveSleepSession();
-
     return null;
   }
 }
@@ -55,6 +68,9 @@ export async function saveActiveSleepSession(
   );
 }
 
-export async function clearActiveSleepSession(): Promise<void> {
-  await AsyncStorage.removeItem(ACTIVE_SLEEP_STORAGE_KEY);
+export async function clearActiveSleepSession():
+  Promise<void> {
+  await AsyncStorage.removeItem(
+    ACTIVE_SLEEP_STORAGE_KEY,
+  );
 }

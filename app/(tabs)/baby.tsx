@@ -18,6 +18,7 @@ import {
   BabyProfile,
 } from '../../lib/babyProfile';
 import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
+import { parseDateOnly } from '../../lib/dateOnly';
 
 export default function BabyScreen() {
   const router = useRouter();
@@ -126,7 +127,7 @@ export default function BabyScreen() {
 
                 <Text style={styles.birthDate}>
                 Born{' '}
-                {new Date(
+                {parseDateOnly(
                     profile.birthDate,
                 ).toLocaleDateString(undefined, {
                     month: 'long',
@@ -160,7 +161,7 @@ export default function BabyScreen() {
 }
 
 function formatBabyAge(birthDate: string): string {
-  const birth = new Date(birthDate);
+  const birth = parseDateOnly(birthDate);
   const today = new Date();
 
   let months =

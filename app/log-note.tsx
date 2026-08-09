@@ -25,6 +25,7 @@ import {
   syncActivityToCloud,
 } from '../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../lib/cloudBaby';
+import { createId } from '../lib/id';
 
 export default function LogNoteScreen() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export default function LogNoteScreen() {
 const occurredAtIso = occurredAt.toISOString();
 
 const noteActivity: BabyActivity = {
-  id: Date.now().toString(),
+  id: createId(),
   babyProfileId: profile.id,
   type: 'note',
   note: note.trim(),

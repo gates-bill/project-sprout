@@ -142,6 +142,52 @@ Deno.serve(async (request) => {
         .filter((path): path is string => Boolean(path));
     });
 
+  for (const membership of photos ?? []) {
+    if (membership.role !== 'owner') continue;
+
+    const { count, error: memberCountError } = await admin
+      .from('care_circle_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('care_circle_id', membership.care_circle_id);
+
+    if (memberCountError) {
+      return jsonResponse(
+        {
+          code: 'DELETE_FAILED',
+          message: 'We could not safely verify Care Circle ownership. Nothing was deleted.',
+        },
+        500,
+      );
+    }
+
+    if ((count ?? 0) > 1) {
+      return jsonResponse(
+        {
+          code: 'OWNER_HAS_MEMBERS',
+          message: 'Transfer ownership or remove the other caregivers before deleting your account.',
+        },
+        409,
+      );
+    }
+  }
+
+  if (photoPaths.length > 0) {
+    const { error: storageError } = await admin.storage
+      .from('baby-profile-photos')
+      .remove(photoPaths);
+
+    if (storageError) {
+      console.error('Shared photo cleanup failed:', storageError);
+      return jsonResponse(
+        {
+          code: 'DELETE_FAILED',
+          message: 'We could not safely remove your shared profile photo. Nothing else was deleted.',
+        },
+        500,
+      );
+    }
+  }
+
   const { data, error } = await admin.rpc(
     'delete_sprout_account',
     {
@@ -166,19 +212,6 @@ Deno.serve(async (request) => {
       },
       ownerHasMembers ? 409 : 500,
     );
-  }
-
-  if (photoPaths.length > 0) {
-    const { error: storageError } = await admin.storage
-      .from('baby-profile-photos')
-      .remove(photoPaths);
-
-    if (storageError) {
-      console.error(
-        'The account was deleted, but shared photo cleanup failed:',
-        storageError,
-      );
-    }
   }
 
   return jsonResponse(

@@ -19,12 +19,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { saveBabyProfile } from '../lib/babyProfile';
-import { loadMyCareCircle } from '../lib/careCircle';
 import {
-  createCloudBaby,
-  loadCloudBabyForCircle,
-} from '../lib/cloudBaby';
+  loadBabyProfile,
+  saveBabyProfile,
+} from '../lib/babyProfile';
+import { loadMyCareCircle } from '../lib/careCircle';
+import { createId } from '../lib/id';
+import {
+  queueProfileUpdate,
+  syncPendingProfileUpdate,
+} from '../lib/profileMutation';
+import {
+  bindCacheToSharedAccount,
+  markCacheLocalOnly,
+} from '../lib/localAccess';
+import { getCurrentSession } from '../lib/auth';
+import {
+  formatDateOnly,
+  validateBirthDate,
+} from '../lib/dateOnly';
 
 export default function CreateProfileScreen() {
   const router = useRouter();
@@ -103,30 +116,49 @@ export default function CreateProfileScreen() {
 
     setSaving(true);
 
+    const birthDateError = validateBirthDate(birthDate);
+    if (birthDateError) {
+      Alert.alert('Check the birth date', birthDateError);
+      setSaving(false);
+      return;
+    }
+
     try {
       const profile = {
-        id: Date.now().toString(),
+        id: createId(),
         name: name.trim(),
-        birthDate: birthDate.toISOString(),
+        birthDate: formatDateOnly(birthDate),
         photoUri,
         createdAt: new Date().toISOString(),
       };
 
       await saveBabyProfile(profile);
+      const persistedProfile = await loadBabyProfile();
+
+      if (!persistedProfile) {
+        throw new Error('The saved baby profile is unavailable.');
+      }
 
       try {
+        const { data: sessionData } =
+          await getCurrentSession();
         const circle = await loadMyCareCircle();
 
-        if (circle) {
-          const existingCloudBaby =
-            await loadCloudBabyForCircle(circle.id);
+        if (circle && sessionData.session) {
+          await queueProfileUpdate(
+            persistedProfile,
+            Boolean(persistedProfile.photoUri),
+          );
+          await bindCacheToSharedAccount({
+            userId: sessionData.session.user.id,
+            careCircleId: circle.id,
+            careCircleName: circle.name,
+            role: circle.role,
+          });
 
-          if (!existingCloudBaby) {
-            await createCloudBaby(
-              circle.id,
-              profile,
-            );
-          }
+          await syncPendingProfileUpdate(circle.id);
+        } else {
+          await markCacheLocalOnly();
         }
       } catch (syncError) {
         console.warn(
