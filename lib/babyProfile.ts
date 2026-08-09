@@ -14,6 +14,7 @@ export type BabyProfile = {
   name: string;
   birthDate: string;
   photoUri: string | null;
+  cloudPhotoPath?: string | null;
   createdAt: string;
 };
 
@@ -107,6 +108,10 @@ export async function saveCloudBabyProfile(
     name: string;
     birthDate: string;
   },
+  sharedPhoto?: {
+    photoUri: string | null;
+    cloudPhotoPath: string | null;
+  },
 ): Promise<BabyProfile> {
   const existingProfile =
     await loadStoredProfile();
@@ -118,8 +123,13 @@ export async function saveCloudBabyProfile(
     name: cloudBaby.name,
     birthDate: cloudBaby.birthDate,
     photoUri:
-      existingProfile?.photoUri ??
-      null,
+      sharedPhoto
+        ? sharedPhoto.photoUri
+        : existingProfile?.photoUri ?? null,
+    cloudPhotoPath:
+      sharedPhoto
+        ? sharedPhoto.cloudPhotoPath
+        : existingProfile?.cloudPhotoPath,
     createdAt:
       existingProfile?.createdAt ??
       new Date().toISOString(),

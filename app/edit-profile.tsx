@@ -26,6 +26,10 @@ import {
 import { loadAccessibleBabyProfile } from '../lib/babyAccess';
 import { CareCircleSummary } from '../lib/careCircle';
 import { updateCloudBabyProfile } from '../lib/cloudBaby';
+import {
+  deleteCloudBabyPhoto,
+  uploadCloudBabyPhoto,
+} from '../lib/cloudBabyPhoto';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -193,19 +197,86 @@ export default function EditProfileScreen() {
 
       let savedName = updatedName;
       let savedBirthDate = updatedBirthDate;
+      let savedCloudPhotoPath =
+        profile.cloudPhotoPath;
 
       if (circle) {
-        const cloudBaby =
-          await updateCloudBabyProfile(
-            circle.id,
-            {
-              name: updatedName,
-              birthDate: updatedBirthDate,
-            },
+        const previousCloudPhotoPath =
+          profile.cloudPhotoPath ?? null;
+        const photoChanged =
+          photoUri !== profile.photoUri ||
+          Boolean(
+            photoUri &&
+            !previousCloudPhotoPath,
           );
+        let uploadedPhotoPath: string | null = null;
+
+        if (photoChanged && photoUri) {
+          uploadedPhotoPath =
+            await uploadCloudBabyPhoto(
+              circle.id,
+              photoUri,
+            );
+        }
+
+        let cloudBaby;
+
+        try {
+          cloudBaby =
+            await updateCloudBabyProfile(
+              circle.id,
+              {
+                name: updatedName,
+                birthDate: updatedBirthDate,
+                ...(photoChanged
+                  ? {
+                      photoPath:
+                        uploadedPhotoPath,
+                    }
+                  : {}),
+              },
+            );
+        } catch (error) {
+          if (uploadedPhotoPath) {
+            try {
+              await deleteCloudBabyPhoto(
+                uploadedPhotoPath,
+              );
+            } catch (cleanupError) {
+              console.warn(
+                'Unable to clean up an unused shared baby photo:',
+                cleanupError,
+              );
+            }
+          }
+
+          throw error;
+        }
 
         savedName = cloudBaby.name;
         savedBirthDate = cloudBaby.birthDate;
+
+        if (photoChanged) {
+          savedCloudPhotoPath =
+            cloudBaby.photoPath;
+
+          if (
+            previousCloudPhotoPath &&
+            previousCloudPhotoPath !==
+              cloudBaby.photoPath
+          ) {
+            try {
+              await deleteCloudBabyPhoto(
+                previousCloudPhotoPath,
+              );
+            } catch (cleanupError) {
+              console.warn(
+                'Unable to remove the previous shared baby photo:',
+                cleanupError,
+              );
+            }
+          }
+        }
       }
 
       await saveBabyProfile({
@@ -213,6 +284,8 @@ export default function EditProfileScreen() {
         name: savedName,
         birthDate: savedBirthDate,
         photoUri,
+        cloudPhotoPath:
+          savedCloudPhotoPath,
       });
 
       router.back();

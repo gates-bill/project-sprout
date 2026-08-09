@@ -1,7 +1,10 @@
 import {
   BabyProfile,
+  loadBabyProfile,
   saveCloudBabyProfile,
 } from './babyProfile';
+import { downloadCloudBabyPhoto } from './cloudBabyPhoto';
+import { isProfilePhotoAvailable } from './profilePhoto';
 import { supabase } from './supabase';
 
 export type CloudBaby = {
@@ -9,6 +12,7 @@ export type CloudBaby = {
   careCircleId: string;
   name: string;
   birthDate: string;
+  photoPath: string | null;
 };
 
 export async function createCloudBaby(
@@ -39,7 +43,7 @@ export async function loadCloudBabyForCircle(
   const { data, error } = await supabase
     .from('babies')
     .select(
-      'id, care_circle_id, name, birth_date',
+      'id, care_circle_id, name, birth_date, photo_path',
     )
     .eq('care_circle_id', careCircleId)
     .limit(1)
@@ -53,12 +57,7 @@ export async function loadCloudBabyForCircle(
     return null;
   }
 
-  return {
-    id: data.id,
-    careCircleId: data.care_circle_id,
-    name: data.name,
-    birthDate: data.birth_date,
-  };
+  return mapCloudBaby(data);
 }
 
 export async function updateCloudBabyProfile(
@@ -66,17 +65,28 @@ export async function updateCloudBabyProfile(
   updates: {
     name: string;
     birthDate: string;
+    photoPath?: string | null;
   },
 ): Promise<CloudBaby> {
+  const cloudUpdates: {
+    name: string;
+    birth_date: string;
+    photo_path?: string | null;
+  } = {
+    name: updates.name,
+    birth_date: updates.birthDate,
+  };
+
+  if (updates.photoPath !== undefined) {
+    cloudUpdates.photo_path = updates.photoPath;
+  }
+
   const { data, error } = await supabase
     .from('babies')
-    .update({
-      name: updates.name,
-      birth_date: updates.birthDate,
-    })
+    .update(cloudUpdates)
     .eq('care_circle_id', careCircleId)
     .select(
-      'id, care_circle_id, name, birth_date',
+      'id, care_circle_id, name, birth_date, photo_path',
     )
     .single();
 
@@ -84,29 +94,82 @@ export async function updateCloudBabyProfile(
     throw error;
   }
 
-  return {
-    id: data.id,
-    careCircleId: data.care_circle_id,
-    name: data.name,
-    birthDate: data.birth_date,
-  };
+  return mapCloudBaby(data);
 }
 
 export async function hydrateLocalBabyFromCloud(
   careCircleId: string,
 ): Promise<BabyProfile | null> {
-  const cloudBaby =
-    await loadCloudBabyForCircle(
-      careCircleId,
-    );
+  const [cloudBaby, existingProfile] =
+    await Promise.all([
+      loadCloudBabyForCircle(careCircleId),
+      loadBabyProfile(),
+    ]);
 
   if (!cloudBaby) {
     return null;
   }
 
-  return saveCloudBabyProfile({
-    id: cloudBaby.id,
-    name: cloudBaby.name,
-    birthDate: cloudBaby.birthDate,
-  });
+  if (
+    cloudBaby.photoPath &&
+    (
+      existingProfile?.cloudPhotoPath !==
+        cloudBaby.photoPath ||
+      !isProfilePhotoAvailable(
+        existingProfile.photoUri,
+      )
+    )
+  ) {
+    try {
+      const photoUri =
+        await downloadCloudBabyPhoto(
+          cloudBaby.photoPath,
+        );
+
+      return saveCloudBabyProfile(
+        cloudBaby,
+        {
+          photoUri,
+          cloudPhotoPath:
+            cloudBaby.photoPath,
+        },
+      );
+    } catch (error) {
+      console.warn(
+        'Unable to refresh shared baby photo:',
+        error,
+      );
+    }
+  }
+
+  if (
+    !cloudBaby.photoPath &&
+    existingProfile?.cloudPhotoPath
+  ) {
+    return saveCloudBabyProfile(
+      cloudBaby,
+      {
+        photoUri: null,
+        cloudPhotoPath: null,
+      },
+    );
+  }
+
+  return saveCloudBabyProfile(cloudBaby);
+}
+
+function mapCloudBaby(data: {
+  id: string;
+  care_circle_id: string;
+  name: string;
+  birth_date: string;
+  photo_path: string | null;
+}): CloudBaby {
+  return {
+    id: data.id,
+    careCircleId: data.care_circle_id,
+    name: data.name,
+    birthDate: data.birth_date,
+    photoPath: data.photo_path,
+  };
 }

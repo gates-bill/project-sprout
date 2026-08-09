@@ -50,6 +50,39 @@ export async function persistProfilePhoto(
   return destinationFile.uri;
 }
 
+export function isProfilePhotoAvailable(
+  uri: string | null,
+): boolean {
+  if (!uri) {
+    return false;
+  }
+
+  return new File(uri).exists;
+}
+
+export async function downloadCloudProfilePhoto(
+  downloadUrl: string,
+  cloudPath: string,
+): Promise<string> {
+  PROFILE_PHOTO_DIRECTORY.create({
+    idempotent: true,
+    intermediates: true,
+  });
+
+  const destinationFile = new File(
+    PROFILE_PHOTO_DIRECTORY,
+    `shared-baby-profile-${Date.now()}.${getFileExtension(cloudPath)}`,
+  );
+
+  const downloadedFile =
+    await File.downloadFileAsync(
+      downloadUrl,
+      destinationFile,
+    );
+
+  return downloadedFile.uri;
+}
+
 export function deleteManagedProfilePhoto(
   uri: string | null,
 ): void {
@@ -71,6 +104,12 @@ export function clearAllProfilePhotos(): void {
   if (PROFILE_PHOTO_DIRECTORY.exists) {
     PROFILE_PHOTO_DIRECTORY.delete();
   }
+}
+
+export function getProfilePhotoFileExtension(
+  uri: string,
+): string {
+  return getFileExtension(uri);
 }
 
 function getFileExtension(uri: string): string {
