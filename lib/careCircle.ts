@@ -6,6 +6,14 @@ export type CareCircleSummary = {
   role: 'owner' | 'caregiver';
 };
 
+export type CareCircleMember = {
+  memberId: string;
+  userId: string;
+  role: 'owner' | 'caregiver';
+  email: string;
+  createdAt: string;
+};
+
 export async function createCareCircle(
   name: string,
 ) {
@@ -60,4 +68,55 @@ export async function loadMyCareCircle():
     name: circle.name,
     role: data.role as 'owner' | 'caregiver',
   };
+}
+
+export async function loadCareCircleMembers(
+  careCircleId: string,
+): Promise<CareCircleMember[]> {
+  const { data, error } = await supabase.rpc(
+    'get_care_circle_members',
+    {
+      circle_id: careCircleId,
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
+
+type CareCircleMemberRow = {
+  member_id: string;
+  user_id: string;
+  role: 'owner' | 'caregiver';
+  email: string;
+  created_at: string;
+};
+
+const members =
+  (data ?? []) as CareCircleMemberRow[];
+
+return members.map((member) => ({
+  memberId: member.member_id,
+  userId: member.user_id,
+  role: member.role,
+  email: member.email,
+  createdAt: member.created_at,
+}));
+}
+
+export async function removeCareCircleMember(
+  careCircleId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc(
+    'remove_care_circle_member',
+    {
+      circle_id: careCircleId,
+      member_user_id: userId,
+    },
+  );
+
+  if (error) {
+    throw error;
+  }
 }

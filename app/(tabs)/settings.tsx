@@ -20,8 +20,11 @@ import {
 } from '../../lib/auth';
 import { loadBabyProfile } from '../../lib/babyProfile';
 import {
+  CareCircleMember,
   createCareCircle,
+  loadCareCircleMembers,
   loadMyCareCircle,
+  removeCareCircleMember,
 } from '../../lib/careCircle';
 import {
   acceptCareCircleInvite,
@@ -64,6 +67,15 @@ export default function SettingsScreen() {
     useState('');
 
   const [generatedInviteCode, setGeneratedInviteCode] =
+    useState<string | null>(null);
+
+  const [careCircleRole, setCareCircleRole] =
+    useState<'owner' | 'caregiver' | null>(null);
+
+  const [careCircleMembers, setCareCircleMembers] =
+    useState<CareCircleMember[]>([]);
+
+  const [removingMemberId, setRemovingMemberId] =
     useState<string | null>(null);
 
   const handleExport = async () => {
@@ -163,6 +175,15 @@ useEffect(() => {
       }
 
       setCareCircleId(circle.id);
+
+      setCareCircleRole(circle.role);
+
+      const members =
+        await loadCareCircleMembers(
+          circle.id,
+        );
+
+      setCareCircleMembers(members);
 
       const cloudBaby =
         await loadCloudBabyForCircle(
@@ -345,6 +366,68 @@ const handleJoinCircle = async () => {
   }
 };
 
+const handleRemoveCaregiver = (
+  member: CareCircleMember,
+) => {
+  if (
+    !careCircleId ||
+    careCircleRole !== 'owner' ||
+    member.role !== 'caregiver'
+  ) {
+    return;
+  }
+
+  Alert.alert(
+    'Remove caregiver?',
+    `${member.email} will no longer have access to this Care Circle.`,
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setRemovingMemberId(
+            member.userId,
+          );
+
+          try {
+            await removeCareCircleMember(
+              careCircleId,
+              member.userId,
+            );
+
+            const members =
+              await loadCareCircleMembers(
+                careCircleId,
+              );
+
+            setCareCircleMembers(
+              members,
+            );
+          } catch (error) {
+            console.error(
+              'Unable to remove caregiver:',
+              error,
+            );
+
+            Alert.alert(
+              'Unable to remove caregiver',
+              error instanceof Error
+                ? error.message
+                : 'Please try again.',
+            );
+          } finally {
+            setRemovingMemberId(null);
+          }
+        },
+      },
+    ],
+  );
+};
+
 const handleSignOut = async () => {
   try {
     const { error } = await signOut();
@@ -362,6 +445,8 @@ const handleSignOut = async () => {
     setSignedInEmail(null);
     setCareCircleId(null);
     setCloudBabyId(null);
+    setCareCircleRole(null);
+    setCareCircleMembers([]);
 
     router.replace('/');
 
@@ -526,6 +611,72 @@ const handleShareInvite = async () => {
     </Text>
   </View>
 )}
+{careCircleId &&
+  careCircleMembers.length > 0 && (
+    <View style={styles.membersSection}>
+      <Text style={styles.membersTitle}>
+        Care Circle members
+      </Text>
+
+      {careCircleMembers.map(
+        (member) => (
+          <View
+            key={member.memberId}
+            style={styles.memberRow}
+          >
+            <View style={styles.memberInfo}>
+              <Text style={styles.memberEmail}>
+                {member.email}
+              </Text>
+
+              <Text style={styles.memberRole}>
+                {member.role === 'owner'
+                  ? 'Owner'
+                  : 'Caregiver'}
+              </Text>
+            </View>
+
+            {careCircleRole === 'owner' &&
+              member.role === 'caregiver' && (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={
+                    removingMemberId ===
+                    member.userId
+                  }
+                  onPress={() =>
+                    handleRemoveCaregiver(
+                      member,
+                    )
+                  }
+                  style={({ pressed }) => [
+                    styles.removeMemberButton,
+                    pressed &&
+                      styles.pressed,
+                  ]}
+                >
+                  {removingMemberId ===
+                  member.userId ? (
+                    <ActivityIndicator
+                      color="#9A403B"
+                      size="small"
+                    />
+                  ) : (
+                    <Text
+                      style={
+                        styles.removeMemberText
+                      }
+                    >
+                      Remove
+                    </Text>
+                  )}
+                </Pressable>
+              )}
+          </View>
+        ),
+      )}
+    </View>
+  )}
     {careCircleId && (
   <Pressable
     accessibilityRole="button"
@@ -1010,6 +1161,53 @@ inviteActionButton: {
 inviteActionText: {
   color: '#48684D',
   fontSize: 14,
+  fontWeight: '700',
+},
+membersSection: {
+  marginTop: 14,
+},
+membersTitle: {
+  color: '#304435',
+  fontSize: 14,
+  fontWeight: '700',
+  marginBottom: 8,
+},
+memberRow: {
+  minHeight: 58,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  borderTopColor: '#E3E8E0',
+  borderTopWidth: 1,
+  paddingVertical: 10,
+},
+memberInfo: {
+  flex: 1,
+  paddingRight: 12,
+},
+memberEmail: {
+  color: '#304435',
+  fontSize: 14,
+  fontWeight: '600',
+},
+memberRole: {
+  color: '#758078',
+  fontSize: 12,
+  marginTop: 3,
+},
+removeMemberButton: {
+  minWidth: 72,
+  minHeight: 38,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderColor: '#D9B8B4',
+  borderRadius: 11,
+  borderWidth: 1,
+  paddingHorizontal: 12,
+},
+removeMemberText: {
+  color: '#9A403B',
+  fontSize: 13,
   fontWeight: '700',
 },
 });
