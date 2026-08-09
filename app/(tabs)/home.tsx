@@ -31,6 +31,7 @@ import {
 import { loadMyCareCircle } from '../../lib/careCircle';
 import {
   downloadCloudActivities,
+  syncPendingActivitiesToCloud,
 } from '../../lib/cloudActivities';
 import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 import {
@@ -107,6 +108,10 @@ if (circle) {
     );
 
   if (cloudBaby) {
+    await syncPendingActivitiesToCloud(
+      cloudBaby.id,
+    );
+
     await downloadCloudActivities(
       cloudBaby.id,
       savedProfile.id,

@@ -216,6 +216,90 @@ export async function syncActivityToCloud(
   );
 }
 
+export async function syncPendingActivitiesToCloud(
+  babyId: string,
+): Promise<number> {
+  const { data: sessionData } =
+    await getCurrentSession();
+
+  const userId =
+    sessionData.session?.user.id;
+
+  if (!userId) {
+    throw new Error(
+      'You must be signed in to sync activities.',
+    );
+  }
+
+  const localActivities =
+    await loadActivities();
+
+  const pendingActivities =
+    localActivities.filter(
+      (activity) =>
+        activity.syncStatus === 'pending',
+    );
+
+  let syncedCount = 0;
+
+  for (const activity of pendingActivities) {
+    const { data: existing, error: lookupError } =
+      await supabase
+        .from('activities')
+        .select('id')
+        .eq('baby_id', babyId)
+        .eq('client_id', activity.id)
+        .maybeSingle();
+
+    if (lookupError) {
+      throw lookupError;
+    }
+
+    const cloudRow =
+      activityToCloudRow(
+        activity,
+        babyId,
+        userId,
+      );
+
+    if (existing) {
+      const {
+        created_by: _createdBy,
+        created_at: _createdAt,
+        ...updateRow
+      } = cloudRow;
+
+      const { error } =
+        await supabase
+          .from('activities')
+          .update(updateRow)
+          .eq('baby_id', babyId)
+          .eq('client_id', activity.id);
+
+      if (error) {
+        throw error;
+      }
+    } else {
+      const { error } =
+        await supabase
+          .from('activities')
+          .insert(cloudRow);
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    await markActivitySynced(
+      activity.id,
+    );
+
+    syncedCount += 1;
+  }
+
+  return syncedCount;
+}
+
 type CloudActivityRow = {
   client_id: string | null;
 
