@@ -61,6 +61,37 @@ export async function loadCloudBabyForCircle(
   };
 }
 
+export async function updateCloudBabyProfile(
+  careCircleId: string,
+  updates: {
+    name: string;
+    birthDate: string;
+  },
+): Promise<CloudBaby> {
+  const { data, error } = await supabase
+    .from('babies')
+    .update({
+      name: updates.name,
+      birth_date: updates.birthDate,
+    })
+    .eq('care_circle_id', careCircleId)
+    .select(
+      'id, care_circle_id, name, birth_date',
+    )
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    careCircleId: data.care_circle_id,
+    name: data.name,
+    birthDate: data.birth_date,
+  };
+}
+
 export async function hydrateLocalBabyFromCloud(
   careCircleId: string,
 ): Promise<BabyProfile | null> {

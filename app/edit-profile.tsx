@@ -21,15 +21,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     BabyProfile,
-    loadBabyProfile,
     saveBabyProfile,
 } from '../lib/babyProfile';
+import { loadAccessibleBabyProfile } from '../lib/babyAccess';
+import { CareCircleSummary } from '../lib/careCircle';
+import { updateCloudBabyProfile } from '../lib/cloudBaby';
 
 export default function EditProfileScreen() {
   const router = useRouter();
 
   const [profile, setProfile] =
     useState<BabyProfile | null>(null);
+  const [circle, setCircle] =
+    useState<CareCircleSummary | null>(null);
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] =
     useState<Date | null>(null);
@@ -45,23 +49,35 @@ export default function EditProfileScreen() {
 
     const loadProfile = async () => {
       try {
-        const savedProfile = await loadBabyProfile();
+        const profileResult =
+          await loadAccessibleBabyProfile();
 
-        if (!savedProfile) {
+        if (profileResult.status !== 'ready') {
           Alert.alert(
-            'Profile not found',
-            'Please create a baby profile first.',
+            profileResult.status === 'access-ended'
+              ? 'Care Circle access ended'
+              : 'Profile not found',
+            profileResult.status === 'access-ended'
+              ? 'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.'
+              : 'Please create or join a Care Circle first.',
           );
 
-          router.replace('/');
+          router.replace(
+            profileResult.status === 'no-care-circle'
+              ? '/settings'
+              : '/',
+          );
           return;
         }
+
+        const savedProfile = profileResult.profile;
 
         if (!isActive) {
           return;
         }
 
         setProfile(savedProfile);
+        setCircle(profileResult.circle);
         setName(savedProfile.name);
         setBirthDate(
           new Date(savedProfile.birthDate),
@@ -171,10 +187,31 @@ export default function EditProfileScreen() {
     setSaving(true);
 
     try {
+      const updatedName = name.trim();
+      const updatedBirthDate =
+        birthDate.toISOString();
+
+      let savedName = updatedName;
+      let savedBirthDate = updatedBirthDate;
+
+      if (circle) {
+        const cloudBaby =
+          await updateCloudBabyProfile(
+            circle.id,
+            {
+              name: updatedName,
+              birthDate: updatedBirthDate,
+            },
+          );
+
+        savedName = cloudBaby.name;
+        savedBirthDate = cloudBaby.birthDate;
+      }
+
       await saveBabyProfile({
         ...profile,
-        name: name.trim(),
-        birthDate: birthDate.toISOString(),
+        name: savedName,
+        birthDate: savedBirthDate,
         photoUri,
       });
 

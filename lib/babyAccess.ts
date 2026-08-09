@@ -85,10 +85,19 @@ export async function loadAccessibleBabyProfile():
 
   await saveSharedCareCircleId(circle.id);
 
-  if (!profile) {
-    profile = await hydrateLocalBabyFromCloud(
-      circle.id,
-    );
+  try {
+    const cloudProfile =
+      await hydrateLocalBabyFromCloud(
+        circle.id,
+      );
+
+    if (cloudProfile) {
+      profile = cloudProfile;
+    }
+  } catch (error) {
+    if (!profile) {
+      throw error;
+    }
   }
 
   return profile
