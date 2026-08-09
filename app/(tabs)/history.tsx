@@ -172,6 +172,27 @@ const loadHistory = async () => {
           scores, streaks, or pressure.
         </Text>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/report')}
+          style={({ pressed }) => [
+            styles.reportButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.reportButtonContent}>
+            <Text style={styles.reportButtonTitle}>
+              Visit report
+            </Text>
+            <Text style={styles.reportButtonDescription}>
+              Summarize recorded care for an appointment.
+            </Text>
+          </View>
+          <Text style={styles.reportButtonAction}>
+            Create ›
+          </Text>
+        </Pressable>
+
         {groups.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>☘</Text>
@@ -515,6 +536,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginTop: 14,
+  },
+  reportButton: {
+    minHeight: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderColor: '#CDD9C9',
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: '#E7EFE3',
+    marginTop: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  reportButtonContent: {
+    flex: 1,
+  },
+  reportButtonTitle: {
+    color: '#304435',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  reportButtonDescription: {
+    color: '#68776B',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  reportButtonAction: {
+    color: '#48684D',
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 12,
   },
   emptyCard: {
     alignItems: 'center',
