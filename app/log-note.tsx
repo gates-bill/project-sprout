@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 export default function LogNoteScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -125,6 +126,7 @@ router.back();
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -181,6 +183,7 @@ router.back();
 
           <ActivityDateTimeField
             onChange={setOccurredAt}
+            scrollViewRef={scrollViewRef}
             value={occurredAt}
           />
 

@@ -1,88 +1,199 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useState } from 'react';
 import {
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Keyboard,
+  LayoutChangeEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
+
+type PickerMode = 'date' | 'time';
 
 type ActivityDateTimeFieldProps = {
   label?: string;
   value: Date;
   onChange: (value: Date) => void;
+  scrollViewRef?: RefObject<ScrollView | null>;
 };
 
 export default function ActivityDateTimeField({
   label = 'DATE & TIME',
   value,
   onChange,
+  scrollViewRef,
 }: ActivityDateTimeFieldProps) {
-  const [showPicker, setShowPicker] =
-    useState(false);
+  const [pickerMode, setPickerMode] =
+    useState<PickerMode | null>(null);
+  const fieldY = useRef(0);
+  const scrollTimer = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimer.current) {
+        clearTimeout(scrollTimer.current);
+      }
+    };
+  }, []);
+
+  const openPicker = (mode: PickerMode) => {
+    Keyboard.dismiss();
+    setPickerMode(mode);
+
+    if (scrollTimer.current) {
+      clearTimeout(scrollTimer.current);
+    }
+
+    scrollTimer.current = setTimeout(() => {
+      scrollViewRef?.current?.scrollTo({
+        animated: true,
+        y: Math.max(0, fieldY.current - 18),
+      });
+    }, 180);
+  };
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    fieldY.current = event.nativeEvent.layout.y;
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>
-        When did this happen?
+    <View
+      onLayout={handleLayout}
+      style={styles.container}
+    >
+      <Text style={styles.sectionLabel}>
+        {label}
       </Text>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setShowPicker(true)}
-        style={({ pressed }) => [
-          styles.field,
-          pressed && styles.pressed,
-        ]}
-      >
-        <View>
-          <Text style={styles.label}>{label}</Text>
+      <View style={styles.fieldRow}>
+        <DateTimeButton
+          accessibilityLabel="Change activity date"
+          caption="Date"
+          icon="▣"
+          onPress={() => openPicker('date')}
+          selected={pickerMode === 'date'}
+          value={value.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        />
 
-          <Text style={styles.fieldValue}>
-            {value.toLocaleDateString(undefined, {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-            {' · '}
-            {value.toLocaleTimeString(undefined, {
-              hour: 'numeric',
-              minute: '2-digit',
-            })}
-          </Text>
-        </View>
+        <DateTimeButton
+          accessibilityLabel="Change activity time"
+          caption="Time"
+          icon="◷"
+          onPress={() => openPicker('time')}
+          selected={pickerMode === 'time'}
+          value={value.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+        />
+      </View>
 
-        <Text style={styles.chevron}>›</Text>
-      </Pressable>
-
-      {showPicker && (
+      {pickerMode && (
         <View style={styles.pickerContainer}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>
+              Change {pickerMode}
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setPickerMode(null)}
+              hitSlop={8}
+            >
+              <Text style={styles.doneText}>Done</Text>
+            </Pressable>
+          </View>
+
           <DateTimePicker
             display="spinner"
             maximumDate={new Date()}
-            mode="datetime"
+            mode={pickerMode}
             onChange={(_event, selectedDate) => {
               if (selectedDate) {
-                onChange(selectedDate);
+                const nextValue = new Date(value);
+
+                if (pickerMode === 'date') {
+                  nextValue.setFullYear(
+                    selectedDate.getFullYear(),
+                    selectedDate.getMonth(),
+                    selectedDate.getDate(),
+                  );
+                } else {
+                  nextValue.setHours(
+                    selectedDate.getHours(),
+                    selectedDate.getMinutes(),
+                    0,
+                    0,
+                  );
+                }
+
+                onChange(nextValue);
               }
             }}
             textColor="#263B2B"
             themeVariant="light"
             value={value}
           />
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setShowPicker(false)}
-            style={styles.doneButton}
-          >
-            <Text style={styles.doneText}>
-              Done
-            </Text>
-          </Pressable>
         </View>
       )}
     </View>
+  );
+}
+
+type DateTimeButtonProps = {
+  accessibilityLabel: string;
+  caption: string;
+  icon: string;
+  onPress: () => void;
+  selected: boolean;
+  value: string;
+};
+
+function DateTimeButton({
+  accessibilityLabel,
+  caption,
+  icon,
+  onPress,
+  selected,
+  value,
+}: DateTimeButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.field,
+        selected && styles.fieldSelected,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={styles.fieldHeading}>
+        <Text style={styles.fieldIcon}>{icon}</Text>
+        <Text style={styles.fieldCaption}>{caption}</Text>
+      </View>
+
+      <Text numberOfLines={1} style={styles.fieldValue}>
+        {value}
+      </Text>
+
+      <Text style={styles.changeText}>
+        Change ›
+      </Text>
+    </Pressable>
   );
 }
 
@@ -90,54 +201,83 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 28,
   },
-  label: {
+  sectionLabel: {
     color: '#344A39',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.9,
     marginBottom: 10,
   },
-  field: {
-    minHeight: 64,
+  fieldRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
+  },
+  field: {
+    minHeight: 112,
+    flex: 1,
     borderColor: '#DDE3DA',
-    borderRadius: 16,
+    borderRadius: 17,
     borderWidth: 1,
     backgroundColor: '#FFFEFA',
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
   },
-  fieldLabel: {
-    color: '#7A867D',
-    fontSize: 10,
+  fieldSelected: {
+    borderColor: '#AFC2AC',
+    backgroundColor: '#F3F7F0',
+  },
+  fieldHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fieldIcon: {
+    color: '#657A68',
+    fontSize: 14,
+  },
+  fieldCaption: {
+    color: '#718075',
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
   },
   fieldValue: {
     color: '#304435',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 9,
   },
-  chevron: {
-    color: '#718075',
-    fontSize: 24,
+  changeText: {
+    color: '#657A68',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 7,
   },
   pickerContainer: {
     overflow: 'hidden',
-    borderRadius: 16,
+    borderColor: '#E0E5DC',
+    borderRadius: 18,
+    borderWidth: 1,
     backgroundColor: '#FFFEFA',
     marginTop: 10,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
-  doneButton: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+  pickerHeader: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomColor: '#EDF0E9',
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+  },
+  pickerTitle: {
+    color: '#657569',
+    fontSize: 13,
+    fontWeight: '700',
   },
   doneText: {
     color: '#48684D',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   pressed: {

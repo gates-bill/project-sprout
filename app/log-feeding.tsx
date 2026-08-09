@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,7 @@ const feedingMethods: FeedingMethod[] = [
 
 export default function LogFeedingScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [feedingMethod, setFeedingMethod] =
     useState<FeedingMethod | null>(null);
@@ -167,6 +168,7 @@ try {
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -258,6 +260,7 @@ try {
 
           <ActivityDateTimeField
             onChange={setOccurredAt}
+            scrollViewRef={scrollViewRef}
             value={occurredAt}
           />
 

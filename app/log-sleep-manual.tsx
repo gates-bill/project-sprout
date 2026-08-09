@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import { loadCloudBabyForCircle } from '../lib/cloudBaby';
 
 export default function LogManualSleepScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const now = new Date();
 
@@ -175,6 +176,7 @@ router.back();
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -203,15 +205,15 @@ router.back();
 
           <ActivityDateTimeField
             onChange={setStartedAt}
+            scrollViewRef={scrollViewRef}
             value={startedAt}
           />
 
-          <View style={styles.endField}>
-            <ActivityDateTimeField
-              onChange={setEndedAt}
-              value={endedAt}
-            />
-          </View>
+          <ActivityDateTimeField
+            onChange={setEndedAt}
+            scrollViewRef={scrollViewRef}
+            value={endedAt}
+          />
 
           <View style={styles.durationCard}>
             <Text style={styles.durationLabel}>
@@ -340,9 +342,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginTop: 14,
-  },
-  endField: {
-    marginTop: -10,
   },
   durationCard: {
     borderColor: '#DDE5D9',

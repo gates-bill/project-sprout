@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,7 @@ const diaperTypes: {
 
 export default function LogDiaperScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [diaperType, setDiaperType] =
     useState<DiaperType | null>(null);
@@ -140,6 +141,7 @@ router.back();
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
@@ -228,6 +230,7 @@ router.back();
 
           <ActivityDateTimeField
             onChange={setOccurredAt}
+            scrollViewRef={scrollViewRef}
             value={occurredAt}
           />
 

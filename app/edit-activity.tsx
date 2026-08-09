@@ -2,7 +2,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -46,6 +46,7 @@ const diaperTypes: DiaperType[] = [
 
 export default function EditActivityScreen() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const { id } = useLocalSearchParams<{
     id: string;
@@ -404,6 +405,7 @@ try {
         style={styles.keyboardView}
       >
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -540,6 +542,7 @@ try {
             <ActivityDateTimeField
               label="DATE & TIME"
               onChange={setOccurredAt}
+              scrollViewRef={scrollViewRef}
               value={occurredAt}
             />
           )}
@@ -549,12 +552,14 @@ try {
               <ActivityDateTimeField
                 label="STARTED"
                 onChange={setStartedAt}
+                scrollViewRef={scrollViewRef}
                 value={startedAt}
               />
 
               <ActivityDateTimeField
                 label="ENDED"
                 onChange={setEndedAt}
+                scrollViewRef={scrollViewRef}
                 value={endedAt}
               />
 
