@@ -1,21 +1,21 @@
 import {
-    useFocusEffect,
-    useRouter,
+  useFocusEffect,
+  useRouter,
 } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-    BabyProfile,
-    loadBabyProfile,
+  BabyProfile,
+  loadBabyProfile,
 } from '../../lib/babyProfile';
 
 export default function BabyScreen() {
@@ -33,9 +33,14 @@ export default function BabyScreen() {
         try {
           const savedProfile = await loadBabyProfile();
 
-          if (isActive) {
-            setProfile(savedProfile);
-          }
+        if (!savedProfile) {
+          router.replace('/settings');
+          return;
+        }
+
+        if (isActive) {
+          setProfile(savedProfile);
+        }
         } finally {
           if (isActive) {
             setLoading(false);
@@ -48,7 +53,7 @@ export default function BabyScreen() {
       return () => {
         isActive = false;
       };
-    }, []),
+    }, [router]),
   );
 
   if (loading) {

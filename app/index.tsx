@@ -36,35 +36,46 @@ useEffect(() => {
 
       const session = data.session;
 
-      if (session) {
-        const circle =
-          await loadMyCareCircle();
-
-        if (circle) {
-          const hydratedProfile =
-            await hydrateLocalBabyFromCloud(
-              circle.id,
-            );
-
-          if (hydratedProfile) {
-            router.replace('/home');
-            return;
-          }
+      if (!session) {
+        if (isMounted) {
+          setCheckingProfile(false);
         }
+
+        return;
       }
+
+      const circle =
+        await loadMyCareCircle();
+
+      if (!circle) {
+        router.replace('/settings');
+        return;
+      }
+
+      const hydratedProfile =
+        await hydrateLocalBabyFromCloud(
+          circle.id,
+        );
+
+      if (hydratedProfile) {
+        router.replace('/home');
+        return;
+      }
+
+      router.replace('/settings');
     } catch (error) {
       console.error(
         'Unable to check Sprout startup state:',
         error,
       );
-    }
 
-    if (isMounted) {
-      setCheckingProfile(false);
+      if (isMounted) {
+        setCheckingProfile(false);
+      }
     }
   };
 
-  checkForSavedProfile();
+  void checkForSavedProfile();
 
   return () => {
     isMounted = false;
