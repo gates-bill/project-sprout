@@ -5,6 +5,7 @@ import {
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -15,8 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   BabyProfile,
-  loadBabyProfile,
 } from '../../lib/babyProfile';
+import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
 
 export default function BabyScreen() {
   const router = useRouter();
@@ -31,16 +32,35 @@ export default function BabyScreen() {
 
       const loadProfile = async () => {
         try {
-          const savedProfile = await loadBabyProfile();
+          const profileResult =
+            await loadAccessibleBabyProfile();
 
-        if (!savedProfile) {
-          router.replace('/settings');
-          return;
-        }
+          if (profileResult.status !== 'ready') {
+            if (profileResult.status === 'access-ended') {
+              if (isActive) {
+                setProfile(null);
+              }
 
-        if (isActive) {
-          setProfile(savedProfile);
-        }
+              router.replace('/');
+
+              Alert.alert(
+                'Care Circle access ended',
+                'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+              );
+            } else {
+              router.replace(
+                profileResult.status === 'signed-out'
+                  ? '/'
+                  : '/settings',
+              );
+            }
+
+            return;
+          }
+
+          if (isActive) {
+            setProfile(profileResult.profile);
+          }
         } finally {
           if (isActive) {
             setLoading(false);

@@ -23,12 +23,10 @@ import {
   BabyActivity,
   loadActivities,
 } from '../../lib/activities';
-import { getCurrentSession } from '../../lib/auth';
+import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
 import {
   BabyProfile,
-  loadBabyProfile,
 } from '../../lib/babyProfile';
-import { loadMyCareCircle } from '../../lib/careCircle';
 import {
   downloadCloudActivities,
   syncPendingActivitiesToCloud,
@@ -37,12 +35,6 @@ import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
 import {
   loadCloudActiveSleep,
 } from '../../lib/cloudSleepSession';
-import {
-  deleteAllSproutData,
-} from '../../lib/dataControls';
-import {
-  loadSharedCareCircleId,
-} from '../../lib/sharedCareState';
 import {
   ActiveSleepSession,
   loadActiveSleepSession,
@@ -87,22 +79,38 @@ export default function HomeScreen() {
 
 const loadHomeData = async () => {
   try {
-    const [
-      savedProfile,
-      savedActiveSleep,
-    ] = await Promise.all([
-      loadBabyProfile(),
-      loadActiveSleepSession(),
-    ]);
+    const profileResult =
+      await loadAccessibleBabyProfile();
 
-    if (!savedProfile) {
-      router.replace('/');
+    if (profileResult.status !== 'ready') {
+      if (profileResult.status === 'access-ended') {
+        if (isActive) {
+          setProfile(null);
+          setActivities([]);
+          setActiveSleep(null);
+        }
+
+        router.replace('/');
+
+        Alert.alert(
+          'Care Circle access ended',
+          'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+        );
+      } else {
+        router.replace(
+          profileResult.status === 'signed-out'
+            ? '/'
+            : '/settings',
+        );
+      }
+
       return;
     }
 
+    const savedProfile = profileResult.profile;
+
     try {
-const circle =
-  await loadMyCareCircle();
+const circle = profileResult.circle;
 
 if (circle) {
   const cloudBaby =
@@ -125,34 +133,6 @@ if (cloudBaby) {
     savedProfile.id,
   );
 }
-} else {
-  const { data: sessionData } =
-    await getCurrentSession();
-
-  const previousCareCircleId =
-    await loadSharedCareCircleId();
-
-  if (
-    sessionData.session &&
-    previousCareCircleId
-  ) {
-    await deleteAllSproutData();
-
-    if (isActive) {
-      setProfile(null);
-      setActivities([]);
-      setActiveSleep(null);
-    }
-
-    router.replace('/');
-
-    Alert.alert(
-      'Care Circle access ended',
-      'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
-    );
-
-    return;
-  }
 }
     } catch (syncError) {
       console.warn(

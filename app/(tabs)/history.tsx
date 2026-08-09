@@ -21,8 +21,7 @@ import {
   BabyActivity,
   loadActivities,
 } from '../../lib/activities';
-import { loadBabyProfile } from '../../lib/babyProfile';
-import { loadMyCareCircle } from '../../lib/careCircle';
+import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
 import {
   downloadCloudActivities,
 } from '../../lib/cloudActivities';
@@ -49,17 +48,36 @@ const loadHistory = async () => {
   setLoading(true);
 
   try {
-    const profile =
-      await loadBabyProfile();
+    const profileResult =
+      await loadAccessibleBabyProfile();
 
-    if (!profile) {
-      router.replace('/');
+    if (profileResult.status !== 'ready') {
+      if (profileResult.status === 'access-ended') {
+        if (isActive) {
+          setGroups([]);
+        }
+
+        router.replace('/');
+
+        Alert.alert(
+          'Care Circle access ended',
+          'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+        );
+      } else {
+        router.replace(
+          profileResult.status === 'signed-out'
+            ? '/'
+            : '/settings',
+        );
+      }
+
       return;
     }
 
+    const profile = profileResult.profile;
+
     try {
-      const circle =
-        await loadMyCareCircle();
+      const circle = profileResult.circle;
 
       if (circle) {
         const cloudBaby =
