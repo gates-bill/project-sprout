@@ -266,7 +266,7 @@ export default function ReportScreen() {
 
       Alert.alert(
         'Unable to share report',
-        'Sprout could not create or share the PDF. Please try again.',
+        'Our Baby Log could not create or share the PDF. Please try again.',
       );
     } finally {
       setSharing(false);

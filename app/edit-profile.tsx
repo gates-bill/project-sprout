@@ -239,7 +239,7 @@ export default function EditProfileScreen() {
           );
           Alert.alert(
             'Saved on this device',
-            'Sprout will share these profile changes when you are back online.',
+            'Our Baby Log will share these profile changes when you are back online.',
           );
         }
       }
@@ -307,7 +307,7 @@ export default function EditProfileScreen() {
 
           <Text style={styles.description}>
             Update the details that help personalize
-            Sprout for your family.
+            Our Baby Log for your family.
           </Text>
 
           <View style={styles.photoSection}>

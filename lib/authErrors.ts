@@ -21,7 +21,7 @@ export function getFriendlyAuthError(
     return 'Use a password with at least 8 characters.';
   }
   if (value.includes('network') || value.includes('fetch')) {
-    return 'Sprout could not connect. Check your internet connection and try again.';
+    return 'Our Baby Log could not connect. Check your internet connection and try again.';
   }
   if (value.includes('session') || value.includes('jwt')) {
     return 'Your session expired. Sign in again to continue.';

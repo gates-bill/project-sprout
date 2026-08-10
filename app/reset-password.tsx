@@ -90,7 +90,7 @@ export default function ResetPasswordScreen() {
         <Text style={styles.eyebrow}>ACCOUNT SECURITY</Text>
         <Text style={styles.title}>Choose a new password</Text>
         <Text style={styles.description}>
-          Use at least 8 characters. Your other Sprout data will not change.
+          Use at least 8 characters. Your other Our Baby Log data will not change.
         </Text>
 
         <TextInput

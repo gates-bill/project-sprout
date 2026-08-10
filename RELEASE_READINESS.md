@@ -1,4 +1,10 @@
-# Project Sprout release readiness
+# Our Baby Log release readiness
+
+## Public branding
+
+- App Name: Our Baby Log
+- Tagline: Baby care, together.
+- Suggested App Store subtitle: Feeding, Sleep & Diaper Tracker
 
 This repository is prepared for an internal TestFlight build after the backend migrations and Edge Function below are deployed and the manual blockers are resolved. It is not ready for external TestFlight or App Store review until public policy/support URLs, final identifiers/assets, and deployed-device scenarios are verified.
 
@@ -27,9 +33,9 @@ Configure Auth URL settings:
 
 ## EAS and store setup
 
-1. Decide the permanent app name, iOS bundle ID, Android package, and URL scheme. `com.projectsprout.app` and `projectsprout` are release candidates, not confirmed legal/brand decisions; identifiers are difficult to change after store release.
-2. Replace/approve every file in `assets/images` at App Store production sizes. Current assets have not been approved as final branding.
-3. Run `eas init`, then add the resulting EAS project ID to app config if prompted.
+1. Keep the existing Apple/Google application identity: `com.projectsprout.app` on both platforms. Keep `projectsprout` as the URL scheme so existing reset-password links continue to work.
+2. Review the finalized Our Baby Log icon and related branding assets on physical devices before submission.
+3. Keep the existing EAS project linkage and project ID in app config.
 4. Store only the Supabase URL and publishable key in EAS environment variables.
 5. Build with `eas build --platform ios --profile preview` for internal testing, then `eas build --platform ios --profile production`.
 6. Submit with `eas submit --platform ios --profile production` only after privacy metadata and reviewer material are complete.
@@ -45,7 +51,7 @@ Configure Auth URL settings:
 
 The privacy policy must describe account/profile data, child-related care records, shared caregivers, photos, Supabase processing/storage, local device cache, report/PDF generation, retention, membership removal, and account/data deletion. Explain that shared family history remains when a caregiver deletes their own account and an owner remains.
 
-For App Store Connect privacy answers, review at least identifiers/contact info (email/account ID), user content (baby name, birth date, care notes, photos), health/fitness-adjacent care logs, diagnostics if analytics/crash reporting is later added, and data linked to the account. Project Sprout currently uses Supabase as an authentication/database/storage/Edge Function processor. Re-evaluate answers whenever SDKs are added.
+For App Store Connect privacy answers, review at least identifiers/contact info (email/account ID), user content (baby name, birth date, care notes, photos), health/fitness-adjacent care logs, diagnostics if analytics/crash reporting is later added, and data linked to the account. Our Baby Log currently uses Supabase as an authentication/database/storage/Edge Function processor. Re-evaluate answers whenever SDKs are added.
 
 Email/password is the only login method, so Sign in with Apple is not currently required merely because authentication exists. Re-evaluate if Google/Facebook or another third-party social login is added.
 
@@ -69,7 +75,7 @@ Do not provide a reusable invite code in review notes because invites expire and
 - Local activity creates, edits, and deletes are queued and retried independently. UUID operation IDs make retries idempotent.
 - Cloud activity rows have monotonically increasing revisions. Edits/deletes use optimistic revision checks; for this MVP the newer server version wins a detected conflict, and the next download replaces stale local state.
 - Active-sleep starts and ends have durable local states. Completion is an atomic server RPC that creates one completed activity and removes the live session once.
-- Shared cached data is bound in SecureStore to one account and Care Circle. Sign-out, account switching, or confirmed membership loss clears Sprout caches and generated exports. A matching account may use verified cached shared data while temporarily offline.
+- Shared cached data is bound in SecureStore to one account and Care Circle. Sign-out, account switching, or confirmed membership loss clears Our Baby Log caches and generated exports. A matching account may use verified cached shared data while temporarily offline.
 - Profile edits are local-first and queued. Failed photo downloads do not erase an existing cached photo. Old cloud photo objects are removed after a successful replacement.
 - Birth dates are local calendar dates (`YYYY-MM-DD`), not timestamps.
 - Reports are limited to 366 inclusive calendar days and show zero-activity days. A completed sleep is attributed to the local calendar day of its recorded `occurredAt`/completion timestamp, even if it began before midnight. PDF cache files are removed after sharing and during privacy wipe.

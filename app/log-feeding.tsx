@@ -137,7 +137,7 @@ try {
 
   Alert.alert(
     'Saved on this device',
-    'The feeding was saved, but Sprout could not sync it with your Care Circle yet.',
+    'The feeding was saved, but Our Baby Log could not sync it with your Care Circle yet.',
   );
 }
 

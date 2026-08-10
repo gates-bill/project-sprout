@@ -138,7 +138,7 @@ try {
 
   Alert.alert(
     'Saved on this device',
-    'The sleep entry was saved, but Sprout could not sync it with your Care Circle yet.',
+    'The sleep entry was saved, but Our Baby Log could not sync it with your Care Circle yet.',
   );
 }
 

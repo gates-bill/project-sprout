@@ -103,7 +103,7 @@ try {
 
   Alert.alert(
     'Saved on this device',
-    'The note was saved, but Sprout could not sync it with your Care Circle yet.',
+    'The note was saved, but Our Baby Log could not sync it with your Care Circle yet.',
   );
 }
 

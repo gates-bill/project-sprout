@@ -75,7 +75,7 @@ export function createReportFilename(
     .replace(/^-+|-+$/g, '') || 'Baby';
 
   return [
-    'Sprout-Report',
+    'Our-Baby-Log-Report',
     safeName,
     formatFilenameDate(startDate),
     'to',

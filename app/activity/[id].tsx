@@ -151,7 +151,7 @@ const handleDelete = async () => {
 
       Alert.alert(
         'Deleted on this device',
-        'The shared deletion will sync when Sprout reconnects.',
+        'The shared deletion will sync when Our Baby Log reconnects.',
       );
     }
 

@@ -59,21 +59,17 @@ export default function HomeScreen() {
     useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const refreshLock = useRef(false);
-  const todaySummary = getTodaySummary(activities);
+  const todaySummary = getTodaySummary(activities, nowMs);
 
   useEffect(() => {
-    if (!activeSleep) {
-      return;
-    }
-
     const interval = setInterval(() => {
       setNowMs(Date.now());
-    }, 30000);
+    }, 60000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [activeSleep]);
+  }, []);
 
   const applyHomeData = useCallback(
     async (result: SharedRefreshResult) => {
@@ -87,10 +83,17 @@ export default function HomeScreen() {
           loadActiveSleepSession(),
         ]);
       const today = new Date();
-      const todaysActivities = savedActivities.filter((activity) =>
-        activity.babyProfileId === savedProfile.id &&
-        new Date(activity.occurredAt).toDateString() === today.toDateString(),
-      );
+      const todaysActivities = savedActivities.filter((activity) => {
+        const summaryTimestamp =
+          activity.type === 'sleep'
+            ? activity.endedAt
+            : activity.occurredAt;
+
+        return (
+          activity.babyProfileId === savedProfile.id &&
+          new Date(summaryTimestamp).toDateString() === today.toDateString()
+        );
+      });
       const activitySync = result.activitySync;
       const pendingCount =
         pendingMutations.length || activitySync?.failed || 0;
@@ -106,6 +109,7 @@ export default function HomeScreen() {
       );
       setProfile(savedProfile);
       setActivities(todaysActivities);
+      setNowMs(Date.now());
       setActiveSleep(
         refreshedActiveSleep?.babyProfileId === savedProfile.id &&
         refreshedActiveSleep.syncStatus !== 'pending-end'
@@ -326,6 +330,12 @@ const handleQuickAction = (label: string) => {
                     oz total
                   </Text>
                 )}
+                <Text style={styles.summaryRecency}>
+                  {formatRelativeElapsed(
+                    todaySummary.lastFeedingAt,
+                    nowMs,
+                  )}
+                </Text>
               </View>
 
               <View style={styles.summaryCard}>
@@ -341,6 +351,12 @@ const handleQuickAction = (label: string) => {
                     {todaySummary.diaperDetails}
                   </Text>
                 )}
+                <Text style={styles.summaryRecency}>
+                  {formatRelativeElapsed(
+                    todaySummary.lastDiaperAt,
+                    nowMs,
+                  )}
+                </Text>
               </View>
 
               <View style={styles.summaryCard}>
@@ -359,6 +375,14 @@ const handleQuickAction = (label: string) => {
                     ? 'session'
                     : 'sessions'}
                 </Text>
+                <Text style={styles.summaryRecency}>
+                  {activeSleep
+                    ? 'Sleeping now'
+                    : formatRelativeElapsed(
+                        todaySummary.lastSleepEndedAt,
+                        nowMs,
+                      )}
+                </Text>
               </View>
 
               <View style={styles.summaryCard}>
@@ -368,6 +392,12 @@ const handleQuickAction = (label: string) => {
                 </Text>
                 <Text style={styles.summaryLabel}>
                   Notes
+                </Text>
+                <Text style={styles.summaryRecency}>
+                  {formatRelativeElapsed(
+                    todaySummary.lastNoteAt,
+                    nowMs,
+                  )}
                 </Text>
               </View>
             </View>
@@ -553,8 +583,9 @@ function formatDuration(minutes: number): string {
 
 function getTodaySummary(
   activities: BabyActivity[],
+  nowMs: number,
 ) {
-  const now = new Date();
+  const now = new Date(nowMs);
 
   const startOfToday = new Date(
     now.getFullYear(),
@@ -581,10 +612,18 @@ function getTodaySummary(
   let sleepMinutes = 0;
   let sleepSessions = 0;
   let notes = 0;
+  let lastFeedingAt: string | null = null;
+  let lastDiaperAt: string | null = null;
+  let lastSleepEndedAt: string | null = null;
+  let lastNoteAt: string | null = null;
 
   activities.forEach((activity) => {
+    const summaryTimestamp =
+      activity.type === 'sleep'
+        ? activity.endedAt
+        : activity.occurredAt;
     const occurredAt =
-      new Date(activity.occurredAt).getTime();
+      new Date(summaryTimestamp).getTime();
 
     if (
       occurredAt < startOfToday ||
@@ -596,6 +635,10 @@ function getTodaySummary(
     switch (activity.type) {
       case 'feeding':
         feedings += 1;
+        lastFeedingAt = getLaterTimestamp(
+          lastFeedingAt,
+          activity.occurredAt,
+        );
 
         if (activity.amountOz !== null) {
           feedingsWithOunces += 1;
@@ -606,6 +649,10 @@ function getTodaySummary(
 
       case 'diaper':
         diapers += 1;
+        lastDiaperAt = getLaterTimestamp(
+          lastDiaperAt,
+          activity.occurredAt,
+        );
         diaperCounts[activity.diaperType] += 1;
         break;
 
@@ -613,10 +660,18 @@ function getTodaySummary(
         sleepMinutes +=
           activity.durationMinutes;
         sleepSessions += 1;
+        lastSleepEndedAt = getLaterTimestamp(
+          lastSleepEndedAt,
+          activity.endedAt,
+        );
         break;
 
       case 'note':
         notes += 1;
+        lastNoteAt = getLaterTimestamp(
+          lastNoteAt,
+          activity.occurredAt,
+        );
         break;
     }
   });
@@ -636,7 +691,53 @@ function getTodaySummary(
     sleepMinutes,
     sleepSessions,
     notes,
+    lastFeedingAt,
+    lastDiaperAt,
+    lastSleepEndedAt,
+    lastNoteAt,
   };
+}
+
+function getLaterTimestamp(
+  current: string | null,
+  candidate: string,
+): string {
+  if (!current) return candidate;
+
+  return new Date(candidate).getTime() >
+    new Date(current).getTime()
+    ? candidate
+    : current;
+}
+
+function formatRelativeElapsed(
+  timestamp: string | null,
+  nowMs: number,
+): string {
+  if (!timestamp) return 'None today';
+
+  const timestampMs = new Date(timestamp).getTime();
+
+  if (!Number.isFinite(timestampMs)) {
+    return 'None today';
+  }
+
+  const elapsedMinutes = Math.max(
+    0,
+    Math.floor((nowMs - timestampMs) / 60000),
+  );
+
+  if (elapsedMinutes < 1) return 'Just now';
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+
+  const hours = Math.floor(elapsedMinutes / 60);
+  const minutes = elapsedMinutes % 60;
+
+  if (minutes === 0 || hours >= 2) {
+    return `${hours}h ago`;
+  }
+
+  return `${hours}h ${minutes}m ago`;
 }
 
 function formatOunces(ounces: number): string {
@@ -953,5 +1054,12 @@ summaryDetail: {
   fontSize: 11,
   lineHeight: 15,
   marginTop: 5,
+},
+summaryRecency: {
+  color: '#657A68',
+  fontSize: 11,
+  fontWeight: '600',
+  lineHeight: 15,
+  marginTop: 4,
 },
 });

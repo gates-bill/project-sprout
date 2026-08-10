@@ -350,7 +350,7 @@ try {
 
     Alert.alert(
       'Saved on this device',
-      'Your edit is saved and will sync when Sprout reconnects.',
+      'Your edit is saved and will sync when Our Baby Log reconnects.',
     );
   }
 

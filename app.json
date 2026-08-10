@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Project Sprout",
+    "name": "Our Baby Log",
     "slug": "project-sprout",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,22 +9,21 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.projectsprout.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose a baby profile photo to display for your family.",
-        "NSPhotoLibraryAddUsageDescription": "Save a copy of a shared visit report when you choose to do so."
+        "NSPhotoLibraryAddUsageDescription": "Save a copy of a shared visit report when you choose to do so.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.projectsprout.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#F7F1E3",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -41,9 +40,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F7F1E3",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#1F2D24"
           }
         }
       ],
@@ -55,11 +54,19 @@
       "policy": "appVersion"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/3ebd629c-b9b7-431e-ae36-b31ce0965ef0"
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3ebd629c-b9b7-431e-ae36-b31ce0965ef0"
+      }
+    },
+    "owner": "gates0839"
   }
 }

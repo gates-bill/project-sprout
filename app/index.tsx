@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -39,7 +40,7 @@ useEffect(() => {
       router.replace('/settings');
     } catch (error) {
       console.error(
-        'Unable to check Sprout startup state:',
+        'Unable to check Our Baby Log startup state:',
         error,
       );
 
@@ -71,14 +72,18 @@ if (checkingProfile) {
       <View style={styles.container}>
         <View style={styles.brandRow}>
           <View style={styles.brandMark}>
-            <Text style={styles.brandEmoji}>🌱</Text>
+            <Image
+              accessibilityIgnoresInvertColors
+              source={require('../assets/images/our-baby-log-icon.png')}
+              style={styles.brandIcon}
+            />
           </View>
 
-          <Text style={styles.brandName}>PROJECT SPROUT</Text>
+          <Text style={styles.brandName}>OUR BABY LOG</Text>
         </View>
 
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>A calmer baby tracker</Text>
+          <Text style={styles.eyebrow}>Baby care, together.</Text>
 
           <Text style={styles.title}>
             Baby care, without the pressure.
@@ -176,8 +181,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#DDE9D7',
   },
-  brandEmoji: {
-    fontSize: 20,
+  brandIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   brandName: {
     color: '#536858',

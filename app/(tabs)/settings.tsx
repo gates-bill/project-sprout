@@ -101,13 +101,13 @@ export default function SettingsScreen() {
       await exportSproutData();
     } catch (error) {
       console.error(
-        'Unable to export Sprout data:',
+        'Unable to export Our Baby Log data:',
         error,
       );
 
       Alert.alert(
         'Unable to export data',
-        'Your Sprout data could not be exported. Please try again.',
+        'Your Our Baby Log data could not be exported. Please try again.',
       );
     } finally {
       setExporting(false);
@@ -120,8 +120,8 @@ export default function SettingsScreen() {
     }
 
     Alert.alert(
-      'Delete all Sprout data?',
-      'This permanently removes the baby profile, feedings, diapers, sleep history, and notes stored by Sprout on this device.',
+      'Delete all Our Baby Log data?',
+      'This permanently removes the baby profile, feedings, diapers, sleep history, and notes stored by Our Baby Log on this device.',
       [
         {
           text: 'Cancel',
@@ -145,7 +145,7 @@ export default function SettingsScreen() {
       router.replace('/');
     } catch (error) {
       console.error(
-        'Unable to delete Sprout data:',
+        'Unable to delete Our Baby Log data:',
         error,
       );
 
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
 
         Alert.alert(
           'Account deleted',
-          'Your account was deleted, but Sprout could not finish clearing this device. Reopen the app and use Delete all Sprout data before signing in again.',
+          'Your account was deleted, but Our Baby Log could not finish clearing this device. Reopen the app and use Delete all Our Baby Log data before signing in again.',
         );
 
         return;
@@ -612,7 +612,7 @@ const handleSignOut = async () => {
 
     Alert.alert(
       'Signed out',
-      'You are signed out and this device’s local Sprout data has been cleared.',
+      'You are signed out and this device’s local Our Baby Log data has been cleared.',
     );
   } catch (error) {
     console.error(
@@ -687,7 +687,7 @@ const handleShareInvite = async () => {
   try {
     await Share.share({
       message:
-        `Join my Sprout Care Circle.\n\n` +
+        `Join my care circle in Our Baby Log.\n\n` +
         `Invite code:\n${generatedInviteCode}`,
     });
   } catch (error) {
@@ -710,7 +710,7 @@ const handleShareInvite = async () => {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.eyebrow}>
-          PROJECT SPROUT
+          OUR BABY LOG
         </Text>
 
         <Text style={styles.title}>
@@ -1069,12 +1069,12 @@ const handleShareInvite = async () => {
         <View style={styles.card}>
           <View style={styles.cardTextContainer}>
             <Text style={styles.cardTitle}>
-              Export Sprout data
+              Export Our Baby Log data
             </Text>
 
             <Text style={styles.cardText}>
               Create a JSON copy of the profile and
-              activity data currently stored by Sprout.
+              activity data currently stored by Our Baby Log.
             </Text>
           </View>
 
@@ -1116,7 +1116,7 @@ const handleShareInvite = async () => {
 
         <View style={styles.dangerCard}>
           <Text style={styles.dangerTitle}>
-            Delete all Sprout data
+            Delete all Our Baby Log data
           </Text>
 
           <Text style={styles.dangerText}>
@@ -1159,7 +1159,7 @@ const handleShareInvite = async () => {
             </Text>
 
             <Text style={styles.dangerText}>
-              Permanently remove your Sprout sign-in and
+              Permanently remove your Our Baby Log sign-in and
               Care Circle membership. Owners must first
               remove other caregivers.
             </Text>

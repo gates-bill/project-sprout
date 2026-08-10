@@ -24,7 +24,7 @@ export async function exportSproutData(): Promise<void> {
   ]);
 
   const exportData = {
-    app: 'Project Sprout',
+    app: 'Our Baby Log',
     exportVersion: 1,
     exportedAt: new Date().toISOString(),
     profile,
@@ -38,7 +38,7 @@ export async function exportSproutData(): Promise<void> {
 
   const file = new File(
     Paths.cache,
-    `project-sprout-export-${dateStamp}.json`,
+    `our-baby-log-export-${dateStamp}.json`,
   );
 
   file.create({
@@ -94,6 +94,8 @@ function clearGeneratedSproutFiles(): void {
     if (
       entry instanceof File &&
       (
+        entry.name.startsWith('Our-Baby-Log-Report-') ||
+        entry.name.startsWith('our-baby-log-export-') ||
         entry.name.startsWith('Sprout-Report-') ||
         entry.name.startsWith('project-sprout-export-')
       )

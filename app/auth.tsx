@@ -196,7 +196,7 @@ return (
     >
       <View style={styles.content}>
         <Text style={styles.eyebrow}>
-          PROJECT SPROUT
+          OUR BABY LOG
         </Text>
 
         <Text style={styles.title}>
