@@ -4,12 +4,14 @@ import {
 } from 'expo-router';
 import {
   useCallback,
+  useRef,
   useState,
 } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,11 +23,7 @@ import {
   BabyActivity,
   loadActivities,
 } from '../../lib/activities';
-import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
-import {
-  downloadCloudActivities,
-} from '../../lib/cloudActivities';
-import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
+import { refreshSharedCareData } from '../../lib/sharedRefresh';
 
 type ActivityGroup = {
   dateKey: string;
@@ -39,106 +37,65 @@ export default function HistoryScreen() {
   const [groups, setGroups] =
     useState<ActivityGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLock = useRef(false);
+
+  const loadHistory = useCallback(
+    async (manual = false) => {
+      if (refreshLock.current) return;
+      refreshLock.current = true;
+      if (manual) setRefreshing(true);
+
+      try {
+        const result = await refreshSharedCareData();
+
+        if (result.access.status !== 'ready') {
+          if (result.access.status === 'access-ended') {
+            setGroups([]);
+            router.replace('/');
+            Alert.alert(
+              'Care Circle access ended',
+              'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+            );
+          } else {
+            router.replace(
+              result.access.status === 'signed-out' ? '/' : '/settings',
+            );
+          }
+          return;
+        }
+
+        const savedActivities = await loadActivities();
+        const profileId = result.access.profile.id;
+        setGroups(
+          groupActivitiesByDate(
+            savedActivities.filter(
+              (activity) =>
+                activity.babyProfileId === profileId,
+            ),
+          ),
+        );
+      } catch (error) {
+        console.warn('Unable to refresh History:', error);
+        if (!manual) {
+          Alert.alert(
+            'Unable to load history',
+            'Please go back and try again.',
+          );
+        }
+      } finally {
+        refreshLock.current = false;
+        setLoading(false);
+        if (manual) setRefreshing(false);
+      }
+    },
+    [router],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-
-const loadHistory = async () => {
-  setLoading(true);
-
-  try {
-    const profileResult =
-      await loadAccessibleBabyProfile();
-
-    if (profileResult.status !== 'ready') {
-      if (profileResult.status === 'access-ended') {
-        if (isActive) {
-          setGroups([]);
-        }
-
-        router.replace('/');
-
-        Alert.alert(
-          'Care Circle access ended',
-          'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
-        );
-      } else {
-        router.replace(
-          profileResult.status === 'signed-out'
-            ? '/'
-            : '/settings',
-        );
-      }
-
-      return;
-    }
-
-    const profile = profileResult.profile;
-
-    try {
-      const circle = profileResult.circle;
-
-      if (circle) {
-        const cloudBaby =
-          await loadCloudBabyForCircle(
-            circle.id,
-          );
-
-        if (cloudBaby) {
-          await downloadCloudActivities(
-            cloudBaby.id,
-            profile.id,
-          );
-        }
-      }
-    } catch (syncError) {
-      console.warn(
-        'Unable to refresh shared history:',
-        syncError,
-      );
-    }
-
-    const savedActivities =
-      await loadActivities();
-
-    const profileActivities =
-      savedActivities.filter(
-        (activity) =>
-          activity.babyProfileId === profile.id,
-      );
-
-    const activityGroups =
-      groupActivitiesByDate(
-        profileActivities,
-      );
-
-    if (isActive) {
-      setGroups(activityGroups);
-    }
-  } catch (error) {
-    console.error(
-      'Unable to load history:',
-      error,
-    );
-
-    Alert.alert(
-      'Unable to load history',
-      'Please go back and try again.',
-    );
-  } finally {
-    if (isActive) {
-      setLoading(false);
-    }
-  }
-};
-
-      loadHistory();
-
-      return () => {
-        isActive = false;
-      };
-    }, [router]),
+      void loadHistory();
+    }, [loadHistory]),
   );
 
   if (loading) {
@@ -156,6 +113,13 @@ const loadHistory = async () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void loadHistory(true)}
+            refreshing={refreshing}
+            tintColor="#48684D"
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
 

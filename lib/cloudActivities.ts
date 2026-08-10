@@ -316,9 +316,23 @@ export async function downloadCloudActivities(
 
   const cloudActivities =
     (data ?? []) as CloudActivityRow[];
-  const activities = cloudActivities.map((row) =>
-    cloudRowToActivity(row, localBabyProfileId),
+  const pendingMutations = await loadActivityMutations();
+  const pendingDeleteIds = new Set(
+    pendingMutations
+      .filter(
+        (mutation) =>
+          mutation.babyProfileId === localBabyProfileId &&
+          mutation.kind === 'delete',
+      )
+      .map((mutation) => mutation.activityId),
   );
+  const activities = cloudActivities
+    .filter((row) =>
+      !row.client_id || !pendingDeleteIds.has(row.client_id),
+    )
+    .map((row) =>
+      cloudRowToActivity(row, localBabyProfileId),
+    );
 
   if (!range) {
     await reconcileActivitiesWithCloud(

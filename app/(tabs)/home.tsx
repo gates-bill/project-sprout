@@ -5,6 +5,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState
 } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
   Alert,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,19 +26,13 @@ import {
   loadActivityMutations,
   loadActivities,
 } from '../../lib/activities';
-import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
 import {
   BabyProfile,
 } from '../../lib/babyProfile';
 import {
-  downloadCloudActivities,
-  syncPendingActivitiesToCloud,
-} from '../../lib/cloudActivities';
-import { loadCloudBabyForCircle } from '../../lib/cloudBaby';
-import {
-  loadCloudActiveSleep,
-  syncPendingActiveSleep,
-} from '../../lib/cloudSleepSession';
+  refreshSharedCareData,
+} from '../../lib/sharedRefresh';
+import type { SharedRefreshResult } from '../../lib/sharedRefresh';
 import {
   ActiveSleepSession,
   loadActiveSleepSession,
@@ -61,6 +57,8 @@ export default function HomeScreen() {
   const [nowMs, setNowMs] = useState(Date.now());
   const [syncNotice, setSyncNotice] =
     useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLock = useRef(false);
   const todaySummary = getTodaySummary(activities);
 
   useEffect(() => {
@@ -77,165 +75,93 @@ export default function HomeScreen() {
     };
   }, [activeSleep]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
+  const applyHomeData = useCallback(
+    async (result: SharedRefreshResult) => {
+      if (result.access.status !== 'ready') return;
 
-const loadHomeData = async () => {
-  try {
-    const profileResult =
-      await loadAccessibleBabyProfile();
-
-    if (profileResult.status !== 'ready') {
-      if (profileResult.status === 'access-ended') {
-        if (isActive) {
-          setProfile(null);
-          setActivities([]);
-          setActiveSleep(null);
-        }
-
-        router.replace('/');
-
-        Alert.alert(
-          'Care Circle access ended',
-          'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
-        );
-      } else {
-        router.replace(
-          profileResult.status === 'signed-out'
-            ? '/'
-            : '/settings',
-        );
-      }
-
-      return;
-    }
-
-    const savedProfile = profileResult.profile;
-
-    try {
-const circle = profileResult.circle;
-
-if (circle) {
-  const cloudBaby =
-    await loadCloudBabyForCircle(
-      circle.id,
-    );
-
-if (cloudBaby) {
-  try {
-    await syncPendingActiveSleep(cloudBaby.id);
-  } catch {
-    // A pending sleep operation remains durable for the next refresh.
-  }
-
-  const activitySync = await syncPendingActivitiesToCloud(
-    cloudBaby.id,
-    savedProfile.id,
-  );
-
-  try {
-    await downloadCloudActivities(
-      cloudBaby.id,
-      savedProfile.id,
-    );
-  } catch {
-    // Keep locally available activities when download is unavailable.
-  }
-
-  try {
-    await loadCloudActiveSleep(
-      cloudBaby.id,
-      savedProfile.id,
-    );
-  } catch {
-    // Keep the local active-sleep state when cloud refresh is unavailable.
-  }
-
-  if (isActive) {
-    setSyncNotice(
-      activitySync.failed > 0
-        ? `${activitySync.failed} change${activitySync.failed === 1 ? '' : 's'} waiting to sync`
-        : activitySync.conflicts > 0
-          ? 'A newer shared change was kept'
-          : null,
-    );
-  }
-}
-}
-    } catch (syncError) {
-      console.warn(
-        'Unable to refresh shared activities:',
-        syncError,
+      const savedProfile = result.access.profile;
+      const [savedActivities, pendingMutations, refreshedActiveSleep] =
+        await Promise.all([
+          loadActivities(),
+          loadActivityMutations(),
+          loadActiveSleepSession(),
+        ]);
+      const today = new Date();
+      const todaysActivities = savedActivities.filter((activity) =>
+        activity.babyProfileId === savedProfile.id &&
+        new Date(activity.occurredAt).toDateString() === today.toDateString(),
       );
-    }
+      const activitySync = result.activitySync;
+      const pendingCount =
+        pendingMutations.length || activitySync?.failed || 0;
 
-    const savedActivities =
-      await loadActivities();
-
-    const pendingMutations =
-      await loadActivityMutations();
-
-    const refreshedActiveSleep =
-      await loadActiveSleepSession();
-
-    const today = new Date();
-
-    const todaysActivities =
-      savedActivities.filter((activity) => {
-        const activityDate =
-          new Date(activity.occurredAt);
-
-        return (
-          activity.babyProfileId ===
-            savedProfile.id &&
-          activityDate.toDateString() ===
-            today.toDateString()
-        );
-      });
-
-    if (isActive) {
-      if (pendingMutations.length > 0) {
-        setSyncNotice((currentNotice) =>
-          currentNotice ??
-          `${pendingMutations.length} change${pendingMutations.length === 1 ? '' : 's'} waiting to sync`,
-        );
-      }
+      setSyncNotice(
+        activitySync?.conflicts
+          ? 'A newer shared change was kept'
+          : pendingCount > 0
+            ? `${pendingCount} change${pendingCount === 1 ? '' : 's'} waiting to sync`
+            : result.syncFailed
+              ? 'Shared updates will retry when online'
+              : null,
+      );
       setProfile(savedProfile);
       setActivities(todaysActivities);
-
       setActiveSleep(
-        refreshedActiveSleep?.babyProfileId ===
-          savedProfile.id &&
-        refreshedActiveSleep.syncStatus !==
-          'pending-end'
+        refreshedActiveSleep?.babyProfileId === savedProfile.id &&
+        refreshedActiveSleep.syncStatus !== 'pending-end'
           ? refreshedActiveSleep
           : null,
       );
-    }
-  } catch (error) {
-    console.error(
-      'Unable to load home data:',
-      error,
-    );
+    },
+    [],
+  );
 
-    Alert.alert(
-      'Unable to load today',
-      'Please close the app and try again.',
-    );
-  } finally {
-    if (isActive) {
-      setLoading(false);
-    }
-  }
-};
+  const loadHomeData = useCallback(
+    async (manual = false) => {
+      if (refreshLock.current) return;
+      refreshLock.current = true;
+      if (manual) setRefreshing(true);
 
-      loadHomeData();
+      try {
+        const result = await refreshSharedCareData();
 
-      return () => {
-        isActive = false;
-      };
-    }, [router]),
+        if (result.access.status === 'ready') {
+          await applyHomeData(result);
+        } else if (result.access.status === 'access-ended') {
+          setProfile(null);
+          setActivities([]);
+          setActiveSleep(null);
+          router.replace('/');
+          Alert.alert(
+            'Care Circle access ended',
+            'This account no longer has access to the shared Care Circle. Shared baby data has been removed from this device.',
+          );
+        } else {
+          router.replace(
+            result.access.status === 'signed-out' ? '/' : '/settings',
+          );
+        }
+      } catch (error) {
+        console.warn('Unable to refresh Today:', error);
+        if (!manual) {
+          Alert.alert(
+            'Unable to load today',
+            'Please close the app and try again.',
+          );
+        }
+      } finally {
+        refreshLock.current = false;
+        setLoading(false);
+        if (manual) setRefreshing(false);
+      }
+    },
+    [applyHomeData, router],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadHomeData();
+    }, [loadHomeData]),
   );
 
 const handleQuickAction = (label: string) => {
@@ -280,6 +206,13 @@ const handleQuickAction = (label: string) => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void loadHomeData(true)}
+            refreshing={refreshing}
+            tintColor="#48684D"
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>

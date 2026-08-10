@@ -2,12 +2,14 @@ import {
   useFocusEffect,
   useRouter,
 } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,8 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   BabyProfile,
 } from '../../lib/babyProfile';
-import { loadAccessibleBabyProfile } from '../../lib/babyAccess';
 import { parseDateOnly } from '../../lib/dateOnly';
+import { refreshSharedCareData } from '../../lib/sharedRefresh';
 
 export default function BabyScreen() {
   const router = useRouter();
@@ -26,22 +28,22 @@ export default function BabyScreen() {
   const [profile, setProfile] =
     useState<BabyProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLock = useRef(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
+  const loadProfile = useCallback(
+    async (manual = false) => {
+      if (refreshLock.current) return;
+      refreshLock.current = true;
+      if (manual) setRefreshing(true);
 
-      const loadProfile = async () => {
         try {
-          const profileResult =
-            await loadAccessibleBabyProfile();
+          const result = await refreshSharedCareData();
+          const profileResult = result.access;
 
           if (profileResult.status !== 'ready') {
             if (profileResult.status === 'access-ended') {
-              if (isActive) {
-                setProfile(null);
-              }
-
+              setProfile(null);
               router.replace('/');
 
               Alert.alert(
@@ -59,22 +61,28 @@ export default function BabyScreen() {
             return;
           }
 
-          if (isActive) {
-            setProfile(profileResult.profile);
+          setProfile(profileResult.profile);
+        } catch (error) {
+          console.warn('Unable to refresh Baby:', error);
+          if (!manual) {
+            Alert.alert(
+              'Unable to load baby profile',
+              'Please go back and try again.',
+            );
           }
         } finally {
-          if (isActive) {
-            setLoading(false);
-          }
+          refreshLock.current = false;
+          setLoading(false);
+          if (manual) setRefreshing(false);
         }
-      };
+      },
+    [router],
+  );
 
-      loadProfile();
-
-      return () => {
-        isActive = false;
-      };
-    }, [router]),
+  useFocusEffect(
+    useCallback(() => {
+      void loadProfile();
+    }, [loadProfile]),
   );
 
   if (loading) {
@@ -90,7 +98,17 @@ export default function BabyScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            onRefresh={() => void loadProfile(true)}
+            refreshing={refreshing}
+            tintColor="#48684D"
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.eyebrow}>
           BABY PROFILE
         </Text>
@@ -155,7 +173,7 @@ export default function BabyScreen() {
                 Edit profile
             </Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -222,7 +240,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6F7F2',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 24,
   },
