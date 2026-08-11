@@ -15,41 +15,110 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   completeAuthRedirect,
   getCurrentSession,
+  isPasswordRecoveryCallback,
   updatePassword,
 } from '../lib/auth';
 import { getFriendlyAuthError } from '../lib/authErrors';
+import { supabase } from '../lib/supabase';
+
+const recoveryRequests = new Map<
+  string,
+  ReturnType<typeof completeAuthRedirect>
+>();
+
+function establishRecoverySession(url: string) {
+  const pendingRequest = recoveryRequests.get(url);
+  if (pendingRequest) return pendingRequest;
+
+  const request = completeAuthRedirect(url);
+  recoveryRequests.set(url, request);
+  return request;
+}
+
+const RECOVERY_LINK_ERROR =
+  'This reset link is invalid or expired. Request a new password reset link and try again.';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const linkingUrl = Linking.useLinkingURL();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [checkingLink, setCheckingLink] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const prepare = async () => {
-      const { data } = await getCurrentSession();
-
-      if (!data.session) {
-        const url = await Linking.getInitialURL();
-        if (url) {
-          const { error } = await completeAuthRedirect(url);
-          if (error) {
-            Alert.alert(
-              'Reset link unavailable',
-              getFriendlyAuthError(error, error.message),
-            );
-          }
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'PASSWORD_RECOVERY' && session) {
+          setLinkError(null);
+          setSessionReady(true);
+          setCheckingLink(false);
         }
+      },
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const prepare = async () => {
+      setCheckingLink(true);
+      setSessionReady(false);
+      setLinkError(null);
+
+      if (linkingUrl && isPasswordRecoveryCallback(linkingUrl)) {
+        const { data, error } = await establishRecoverySession(linkingUrl);
+
+        if (!active) return;
+
+        if (error || !data.session) {
+          setLinkError(RECOVERY_LINK_ERROR);
+          setCheckingLink(false);
+          return;
+        }
+
+        const { data: storedSession } = await getCurrentSession();
+        if (!active) return;
+
+        if (!storedSession.session) {
+          setLinkError(RECOVERY_LINK_ERROR);
+          setCheckingLink(false);
+          return;
+        }
+
+        setSessionReady(true);
+        setCheckingLink(false);
+        return;
       }
 
+      const { data } = await getCurrentSession();
+      if (!active) return;
+
+      if (data.session) {
+        setSessionReady(true);
+      } else {
+        setLinkError(RECOVERY_LINK_ERROR);
+      }
       setCheckingLink(false);
     };
 
     void prepare();
-  }, []);
+
+    return () => {
+      active = false;
+    };
+  }, [linkingUrl]);
 
   const save = async () => {
+    if (!sessionReady || checkingLink) {
+      Alert.alert('Reset link unavailable', RECOVERY_LINK_ERROR);
+      return;
+    }
+
     if (password.length < 8 || password !== confirmPassword) {
       Alert.alert(
         'Check your password',
@@ -84,6 +153,25 @@ export default function ResetPasswordScreen() {
     );
   }
 
+  if (linkError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <Text style={styles.eyebrow}>ACCOUNT SECURITY</Text>
+          <Text style={styles.title}>Reset link unavailable</Text>
+          <Text style={styles.description}>{linkError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace('/auth')}
+            style={styles.button}
+          >
+            <Text style={styles.buttonText}>Request a new reset link</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.content}>
@@ -114,7 +202,7 @@ export default function ResetPasswordScreen() {
 
         <Pressable
           accessibilityRole="button"
-          disabled={saving}
+          disabled={saving || !sessionReady}
           onPress={save}
           style={styles.button}
         >
