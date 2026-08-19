@@ -10,62 +10,105 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { loadAccessibleBabyProfile } from '../lib/babyAccess';
+import { loadBabyProfile } from '../lib/babyProfile';
+
+const STARTUP_TIMEOUT_MS = 8_000;
+
+async function withStartupTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error('Startup hydration timed out.'));
+    }, STARTUP_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
   const [checkingProfile, setCheckingProfile] = useState(true);
 
-useEffect(() => {
-  let isMounted = true;
+  useEffect(() => {
+    let isMounted = true;
 
-  const checkForSavedProfile = async () => {
-    try {
-      const access =
-        await loadAccessibleBabyProfile();
+    const checkForSavedProfile = async () => {
+      try {
+        const access = await withStartupTimeout(
+          loadAccessibleBabyProfile(),
+        );
 
-      if (access.status === 'ready') {
-        router.replace('/home');
-        return;
-      }
+        if (!isMounted) {
+          return;
+        }
 
-      if (access.status === 'signed-out') {
+        if (access.status === 'ready') {
+          router.replace('/home');
+          return;
+        }
+
+        if (access.status === 'signed-out') {
+          setCheckingProfile(false);
+          return;
+        }
+
+        router.replace('/settings');
+      } catch (error) {
+        console.warn(
+          'Unable to finish online startup hydration; using local state:',
+          error,
+        );
+
+        try {
+          const localProfile = await withStartupTimeout(
+            loadBabyProfile(),
+          );
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (localProfile) {
+            router.replace('/home');
+            return;
+          }
+        } catch (localError) {
+          console.warn(
+            'Unable to read local startup state:',
+            localError,
+          );
+        }
+
         if (isMounted) {
           setCheckingProfile(false);
         }
-
-        return;
       }
+    };
 
-      router.replace('/settings');
-    } catch (error) {
-      console.error(
-        'Unable to check Our Baby Log startup state:',
-        error,
-      );
+    void checkForSavedProfile();
 
-      if (isMounted) {
-        setCheckingProfile(false);
-      }
-    }
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
-  void checkForSavedProfile();
-
-  return () => {
-    isMounted = false;
-  };
-}, [router]);
-
-if (checkingProfile) {
-  return (
-    <SafeAreaView style={styles.loadingSafeArea}>
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color="#48684D" size="large" />
-      </View>
-    </SafeAreaView>
-  );
-}
+  if (checkingProfile) {
+    return (
+      <SafeAreaView style={styles.loadingSafeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color="#48684D" size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
